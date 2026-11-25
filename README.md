@@ -9,7 +9,7 @@ Một add-in (Office.js) dùng chung một mã nguồn cho cả Excel và Word.
 
 **Excel**
 - Đọc số thành chữ tiếng Việt (ghi vào cột bên phải)
-- Tô vàng hoặc xoá dòng trùng
+- Tô vàng dòng trùng (không tự xoá hàng)
 - Kiểm tra công thức trong cột: tìm ô có công thức khác với đa số công thức cùng cột, hoặc ô nhập tay chen giữa các công thức; bấm vào kết quả để nhảy tới ô, có thể tô đỏ nhạt
 
 **Word**
@@ -53,3 +53,9 @@ Sửa mã trong docs, chạy UPLOAD_ADDIN.bat (cần Git và quyền push). Nế
 ## Bản mở rộng tiện ích phổ thông
 
 Bản này không chứa kiểm tra sản lượng, lương, đơn giá hay quy tắc công ty. Chép các file trong gói cập nhật vào repository hiện có, chạy UPLOAD_ADDIN.bat; giữ manifest cũ. Công cụ Excel có giới hạn 100.000 ô/vùng, tối đa 5.000 ô ghi riêng lẻ mỗi lần; báo cáo lưu tối đa 10.000 kết quả. Chuyển ngày văn bản sang ISO dạng text, không đổi hệ ngày Excel. Gộp sheet theo thứ tự cột của vùng dùng, giữ mọi dòng (kể cả tiêu đề) và chỉ sao chép giá trị. Tham chiếu được nhận diện bằng mẫu công thức trực tiếp, không phân tích INDIRECT, tên định nghĩa, liên kết ẩn hoặc mọi trường hợp 3D. Kiểm tra số thứ tự theo thứ tự hiện tại, báo khoảng nhảy, giảm và trùng. Lưu tùy chọn cục bộ, không lưu nội dung tài liệu. Mẫu hành chính chỉ định dạng font và đoạn, không phải xác nhận tuân thủ thể thức pháp lý; chưa thay đổi lề trang. Chức năng bảng áp dụng kiểu bảng có sẵn. Kiểm thử cú pháp JS và 7 trường hợp phân tích số/ngày; chưa kiểm thử Office thực tế. Nên dùng bản sao tài liệu, nhất là thao tác chèn hàng, đổi tên, gộp và chuyển công thức.
+
+## Bản ổn định
+- Kiểm tra kích thước trước khi tải vùng; gom các ô ghi liên tiếp thành khối; kiểm tra lại nội dung trước khi ghi sau xác nhận.
+- Rà soát công thức bỏ qua cột không có công thức; kết quả kiểm tra cột cũng được đưa vào báo cáo chung. Ô trống khi quét vùng chọn bao gồm cả phần cuối vùng chọn.
+- Số âm làm tròn đối xứng; từ chối số quá lớn. Tô dòng trùng yêu cầu xác nhận; màu nền cũ không được phục hồi bởi công cụ này.
+- Giữ nguyên manifest và chức năng hiện có. Kiểm thử thực tế trong Office vẫn cần thực hiện trên bản sao dữ liệu.

@@ -28,7 +28,8 @@
 
   /** Đọc số nguyên (làm tròn) thành chữ tiếng Việt, tối đa 15 chữ số. */
   function numberToWords(value, withCurrency) {
-    let num = Math.round(Number(value));
+    const raw=Number(value);
+    let num=Math.sign(raw)*Math.round(Math.abs(raw));
     if (!Number.isFinite(num)) return '';
     if (Math.abs(num) > 999999999999999) return 'Số quá lớn';
     const neg = num < 0;
@@ -102,13 +103,13 @@
    */
   function findFormulaOutliers(cells, opts) {
     const o = Object.assign({ manual: true, minFormulas: 3, minShare: 0.5 }, opts);
-    const isFormula = (v) => typeof v === 'string' && v.startsWith('=');
+    const isFormula = (v,i) => typeof v === 'string' && v.startsWith('=') && (!o.values || v!==o.values[i]);
     const counts = new Map();
     let first = -1;
     let last = -1;
     let total = 0;
     cells.forEach((v, i) => {
-      if (!isFormula(v)) return;
+      if (!isFormula(v,i)) return;
       total++;
       counts.set(v, (counts.get(v) || 0) + 1);
       if (first < 0) first = i;
@@ -122,7 +123,7 @@
     const outliers = [];
     for (let i = first; i <= last; i++) {
       const v = cells[i];
-      if (isFormula(v)) {
+      if (isFormula(v,i)) {
         if (v !== dom) outliers.push({ index: i, kind: 'formula' });
       } else if (o.blank && (v === '' || v === null || v === undefined)) {
         outliers.push({ index: i, kind: 'blank' });
@@ -130,7 +131,7 @@
         outliers.push({ index: i, kind: 'manual' });
       }
     }
-    return { status: 'ok', total, domCount, sample: cells.indexOf(dom), outliers };
+    return { status: 'ok', total, domCount, sample: cells.findIndex((v,i)=>v===dom&&isFormula(v,i)), outliers };
   }
 
   const api = { numberToWords, removeAccents, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers };

@@ -27,21 +27,21 @@ const Extra = (() => {
     const all=$('#audit-all').checked;
     const term=$('#audit-query').value.trim().toLocaleLowerCase('vi-VN');
     if(mode==='search'&&!term) throw Error('Nhập từ khoá.');
-    const sheets=ctx.workbook.worksheets; sheets.load('items/name,items/visibility'); await ctx.sync();
+    const sheets=ctx.workbook.worksheets; sheets.load('items/name,items/visibility');
     const active=ctx.workbook.worksheets.getActiveWorksheet(); active.load('name'); await ctx.sync();
     const items=[]; let skipped=0, scanned=0, truncated=false;
     for(const ws of sheets.items){
       if(ws.visibility!=='Visible'||(!all&&ws.name!==active.name)) continue;
-      const r=all?ws.getUsedRangeOrNullObject(true):ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
+      const r=all?ws.getUsedRangeOrNullObject(true):ctx.workbook.getSelectedRange();
       r.load(['rowCount','columnCount','rowIndex','columnIndex']); await ctx.sync();
       if(r.isNullObject) continue;
       if(r.rowCount*r.columnCount>cap){skipped++; continue;}
-      r.load(['values','formulas','formulasR1C1','valueTypes']); await ctx.sync(); scanned++;
+      const props=['values'];if(['search','blank','formula'].includes(mode))props.push('formulas');if(mode==='formula')props.push('formulasR1C1');if(mode==='errors')props.push('valueTypes');r.load(props);await ctx.sync();scanned++;
       const add=(i,j,kind,text)=>{if(items.length>=limit){truncated=true;return;} items.push({sheet:ws.name,addr:TextUtils.columnLetter(r.columnIndex+j)+(r.rowIndex+i+1),kind,text:String(text??'')});};
       if(mode==='duplicate'){
         const seen=new Map(); r.values.forEach((row,i)=>{if(row.every(v=>v===''))return;const key=JSON.stringify(row.map(v=>typeof v==='string'?v.trim().toLowerCase():v)); if(seen.has(key))add(i,0,'Dòng trùng',`Trùng dòng ${r.rowIndex+seen.get(key)+1}`);else seen.set(key,i);});
       } else if(mode==='formula'){
-        for(let j=0;j<r.columnCount;j++){const res=TextUtils.findFormulaOutliers(r.formulasR1C1.map(row=>row[j]),{manual:true,blank:true}); if(res.status==='mixed'||res.status==='few')add(0,j,'Chưa đủ cơ sở',res.status==='mixed'?'Không có mẫu chiếm đa số':'Dưới 3 công thức'); if(res.status==='ok')res.outliers.forEach(o=>add(o.index,j,o.kind==='blank'?'Thiếu công thức':o.kind==='manual'?'Nhập tay':'Khác công thức',r.formulas[o.index][j]));}
+        for(let j=0;j<r.columnCount;j++){const res=TextUtils.findFormulaOutliers(r.formulasR1C1.map(row=>row[j]),{manual:true,blank:true,values:r.values.map(row=>row[j])}); if(!res.total)continue; if(res.status==='mixed'||res.status==='few')add(0,j,'Chưa đủ cơ sở',res.status==='mixed'?'Không có mẫu chiếm đa số':'Dưới 3 công thức'); if(res.status==='ok')res.outliers.forEach(o=>add(o.index,j,o.kind==='blank'?'Thiếu công thức':o.kind==='manual'?'Nhập tay':'Khác công thức',r.formulas[o.index][j]));}
       }else r.values.forEach((row,i)=>row.forEach((v,j)=>{if(mode==='search'&&(String(v).toLocaleLowerCase('vi-VN').includes(term)||String(r.formulas[i][j]).toLocaleLowerCase('vi-VN').includes(term)))add(i,j,'Tìm thấy',v); if(mode==='errors'&&r.valueTypes[i][j]==='Error')add(i,j,'Lỗi Excel',v); if(mode==='blank'&&v===''&&r.formulas[i][j]==='')add(i,j,'Ô trống','');}));
     }
     show(items); return `Đã quét ${scanned} sheet; bỏ qua ${skipped} vùng quá lớn; ${items.length} kết quả${truncated?' (đã chạm giới hạn 10.000)':''}.`;

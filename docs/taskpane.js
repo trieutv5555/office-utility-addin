@@ -27,6 +27,27 @@ const MAX_CELLS = 100000;
 function guard(r) { if (r.rowCount * r.columnCount > MAX_CELLS) throw new Error("Vùng quá lớn; hãy chọn tối đa 100.000 ô mỗi lần."); }
 
 const $ = (sel) => document.querySelector(sel);
+async function loadBounded(ctx,range,props){
+  range.load('rowCount,columnCount');await ctx.sync();
+  if(range.isNullObject)return false;
+  guard(range);range.load(props);await ctx.sync();return true;
+}
+async function assertUnchanged(ctx,range){
+  const snapshot=JSON.stringify([range.values,range.formulas]);
+  range.load('values,formulas');await ctx.sync();
+  if(snapshot!==JSON.stringify([range.values,range.formulas]))throw Error('Dữ liệu đã thay đổi. Hãy chạy lại tiện ích.');
+}
+function writeEdits(range,edits,textFormat=false){
+  const sorted=[...edits].sort((a,b)=>a[1]-b[1]||a[0]-b[0]);
+  for(let i=0;i<sorted.length;){
+    const [row,col]=sorted[i];let end=i+1;
+    while(end<sorted.length&&sorted[end][1]===col&&sorted[end][0]===sorted[end-1][0]+1)end++;
+    const target=range.getCell(row,col).getResizedRange(end-i-1,0);
+    if(textFormat)target.numberFormat=Array.from({length:end-i},()=>['@']);
+    target.values=sorted.slice(i,end).map(x=>[typeof x[2]==='string'&&/^[=+\-@]/.test(x[2])?"'"+x[2]:x[2]]);
+    i=end;
+  }
+}
 
 function setStatus(msg, isError) {
   const el = $('#status');
@@ -40,10 +61,7 @@ function setStatus(msg, isError) {
 function excelTransform(fn) {
   return Excel.run(async (ctx) => {
     const range = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
-    range.load(['formulas', 'address', 'rowCount', 'columnCount', 'valueTypes']);
-    await ctx.sync();
-    if (range.isNullObject) return 'Vùng chọn đang trống.';
-    guard(range);
+    if(!await loadBounded(ctx,range,['values','formulas','address','valueTypes']))return 'Vùng chọn đang trống.';
     let changed = 0;
     const edits = [];
     range.formulas.forEach((row,r) => row.forEach((v,c) => {
@@ -53,7 +71,7 @@ function excelTransform(fn) {
     }));
     if (edits.length > 5000) throw new Error('Chia nhỏ vùng chọn: tối đa 5.000 ô sửa mỗi lần.');
     if (edits.length && !await officeConfirm(`Sửa ${edits.length} ô văn bản? Hãy sao lưu trước khi thực hiện.`)) return 'Đã huỷ.';
-    edits.forEach(([r,c,n]) => { range.getCell(r,c).values = [[/^[=+\-@]/.test(n) ? "'"+n : n]]; changed++; });
+    if(edits.length){await assertUnchanged(ctx,range);writeEdits(range,edits);changed=edits.length;}
     await ctx.sync();
     return changed ? `Đã sửa ${changed} ô (${range.address}).` : 'Không có ô nào cần sửa.';
   });
@@ -62,18 +80,18 @@ function excelTransform(fn) {
 function excelNumbersToWords(withCurrency) {
   return Excel.run(async (ctx) => {
     const range = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
-    range.load(['values', 'columnCount']);
-    await ctx.sync();
-    if (range.isNullObject) return 'Vùng chọn đang trống.';
+    if(!await loadBounded(ctx,range,['values','formulas','columnIndex']))return 'Vùng chọn đang trống.';
     if (range.columnCount > 1) throw new Error('Chỉ chọn một cột số để tránh ghi đè dữ liệu bên cạnh.');
+    if(range.columnIndex>=16383)throw Error('Không còn cột bên phải.');
     const dest = range.getOffsetRange(0,1);
     dest.load(['values','formulas']);
     await ctx.sync();
     const rows = range.values.map((row,r) => [row[0],r]).filter(([v]) => typeof v === 'number');
     if (rows.some(([,r]) => dest.values[r][0] !== '' || dest.formulas[r][0] !== '')) throw new Error('Cột kết quả có dữ liệu hoặc công thức. Hãy để trống các ô đích.');
     if (rows.length > 5000) throw new Error('Tối đa 5.000 số mỗi lần.');
+    if(rows.some(([v])=>!Number.isFinite(v)||Math.round(Math.abs(v))>999999999999999))throw Error('Có số vượt giới hạn 15 chữ số sau làm tròn.');
     if (rows.length && !await officeConfirm(`Ghi ${rows.length} kết quả vào cột bên phải? Số lẻ được làm tròn.`)) return 'Đã huỷ.';
-    rows.forEach(([v,r]) => dest.getCell(r,0).values = [[numberToWords(v,withCurrency)]]);
+    if(rows.length){await assertUnchanged(ctx,range);await assertUnchanged(ctx,dest);writeEdits(dest,rows.map(([v,r])=>[r,0,numberToWords(v,withCurrency)]));}
     const count = rows.length;
     await ctx.sync();
     return count ? `Đã đọc ${count} số thành chữ.` : 'Không tìm thấy ô số nào trong vùng chọn.';
@@ -83,9 +101,7 @@ function excelNumbersToWords(withCurrency) {
 function excelDuplicates(mode) {
   return Excel.run(async (ctx) => {
     const range = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
-    range.load('values');
-    await ctx.sync();
-    if (range.isNullObject) return 'Vùng chọn đang trống.';
+    if(!await loadBounded(ctx,range,['values','formulas']))return 'Vùng chọn đang trống.';
     const seen = new Set();
     const dups = [];
     range.values.forEach((row, i) => {
@@ -96,6 +112,9 @@ function excelDuplicates(mode) {
     });
     if (!dups.length) return 'Không có dòng trùng.';
     if (mode === 'mark') {
+      if(dups.length>2000)throw Error('Quá 2.000 dòng trùng; dùng báo cáo thay cho tô màu.');
+      if(!await officeConfirm('Tô màu '+dups.length+' dòng trùng? Màu nền cũ sẽ bị thay đổi.'))return 'Đã huỷ.';
+      await assertUnchanged(ctx,range);
       dups.forEach((i) => { range.getRow(i).format.fill.color = '#FFF2A8'; });
     } else {
       return 'Đã vô hiệu hoá xoá cả hàng để bảo vệ dữ liệu ngoài vùng chọn. Dùng báo cáo dòng trùng.';
@@ -115,15 +134,13 @@ function excelCheckFormulas(highlight, manual) {
     const sheet = ctx.workbook.worksheets.getActiveWorksheet();
     sheet.load('name');
     const used = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
-    used.load(['formulas', 'formulasR1C1', 'rowIndex', 'columnIndex', 'columnCount']);
-    await ctx.sync();
-    if (used.isNullObject) return 'Vùng chọn đang trống.';
+    if(!await loadBounded(ctx,used,['values','formulas','formulasR1C1','rowIndex','columnIndex'])){renderFormulaReport([],sheet.name);Extra.show([]);return 'Vùng chọn đang trống.';}
 
     const reports = [];
     const flagged = [];
     for (let c = 0; c < used.columnCount; c++) {
       const letter = columnLetter(used.columnIndex + c);
-      const res = findFormulaOutliers(used.formulasR1C1.map((r) => r[c]), { manual, blank: true });
+      const res = findFormulaOutliers(used.formulasR1C1.map((r) => r[c]), { manual, blank: true, values:used.values.map(r=>r[c]) });
       if (res.total === 0) continue; // cột không có công thức thì bỏ qua
       const addrOf = (i) => letter + (used.rowIndex + i + 1);
       const rep = { letter, status: res.status, total: res.total };
@@ -141,21 +158,26 @@ function excelCheckFormulas(highlight, manual) {
       reports.push(rep);
     }
     if (!reports.length) {
-      renderFormulaReport([], sheet.name);
+      renderFormulaReport([], sheet.name);Extra.show([]);
       return 'Vùng chọn không có công thức nào.';
     }
     if (highlight && flagged.length) {
       if (lastFlagged) throw new Error('Hãy hoàn nguyên màu lần kiểm tra trước.');
       if (flagged.length > 2000) throw new Error('Quá 2.000 ô lỗi; hãy tắt tô màu.');
+      if(!await officeConfirm('Tô màu '+flagged.length+' ô lỗi? Chỉ phục hồi gần đúng màu nền trong phiên này.'))return 'Đã huỷ.';
+      await assertUnchanged(ctx,used);
       const fills = flagged.map(a => sheet.getRange(a).format.fill);
       fills.forEach(f => f.load('color'));
       await ctx.sync();
       const colors = fills.map(f => f.color);
       flagged.forEach((a) => { sheet.getRange(a).format.fill.color = '#FFC7CE'; });
+      await ctx.sync();
       lastFlagged = { sheet: sheet.name, addrs: flagged, colors };
     }
     await ctx.sync();
     renderFormulaReport(reports, sheet.name);
+    const combined=reports.flatMap(rep=>(rep.items||[]).map(it=>({sheet:sheet.name,addr:it.addr,kind:it.kind==='blank'?'Thiếu công thức':it.kind==='manual'?'Nhập tay':'Khác công thức',text:it.text})));
+    Extra.show(combined.slice(0,10000));
     return flagged.length
       ? `Đã kiểm tra ${reports.length} cột có công thức, phát hiện ${flagged.length} ô bất thường.`
       : `Đã kiểm tra ${reports.length} cột có công thức, không thấy ô bất thường.`;
@@ -247,6 +269,7 @@ function wordSelectionTransform(fn) {
 
 function wordClean() {
   return Word.run(async (ctx) => {
+    if(!Office.context.requirements.isSetSupported('WordApi','1.3'))throw Error('Cần Word hỗ trợ WordApi 1.3 để dọn tài liệu an toàn.');
     if (!await officeConfirm('Dọn khoảng trắng và đoạn trống toàn tài liệu? Có thể ảnh hưởng bố cục.')) return 'Đã huỷ.';
     const body = ctx.document.body;
     const spaces = body.search('[ ]{2,}', { matchWildcards: true });
@@ -317,7 +340,9 @@ function wordStats() {
 
 function wordInsertDate(long) {
   return Word.run(async (ctx) => {
-    ctx.document.getSelection().insertText(formatDate(new Date(), long), 'Replace');
+    const selection=ctx.document.getSelection();selection.load('text');await ctx.sync();
+    if(selection.text&&!await officeConfirm('Thay vùng văn bản đã chọn bằng ngày hiện tại?'))return 'Đã huỷ.';
+    selection.insertText(formatDate(new Date(), long), 'Replace');
     await ctx.sync();
     return 'Đã chèn ngày.';
   });
@@ -388,7 +413,7 @@ Office.onReady((info) => {
   document.querySelectorAll('button[data-action]').forEach((b) => b.addEventListener('click', () => run(b)));
   $('#fx-results').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-addr]');
-    if (!b) return;
+    if (!b || busy) return;
     excelGoto(b.dataset.sheet, b.dataset.addr).catch((err) => setStatus('Không chọn được ô: ' + (err.message || err), true));
   });
 });
