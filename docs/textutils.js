@@ -124,6 +124,8 @@
       const v = cells[i];
       if (isFormula(v)) {
         if (v !== dom) outliers.push({ index: i, kind: 'formula' });
+      } else if (o.blank && (v === '' || v === null || v === undefined)) {
+        outliers.push({ index: i, kind: 'blank' });
       } else if (o.manual && v !== '' && v !== null && v !== undefined) {
         outliers.push({ index: i, kind: 'manual' });
       }

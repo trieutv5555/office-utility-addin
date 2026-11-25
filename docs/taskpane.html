@@ -13,6 +13,7 @@
     <p id="host-label">Đang kết nối với Office…</p>
   </header>
 
+  <label for="tool-search">Tìm công cụ</label><input id="tool-search" type="search" placeholder="Ví dụ: công thức, trùng, ngày">
   <main>
     <section>
       <h2>Chuẩn hoá văn bản</h2>
@@ -38,7 +39,7 @@
       <p class="hint">So sánh cả dòng trong vùng chọn, không phân biệt hoa/thường. Giữ dòng xuất hiện đầu tiên.</p>
       <div class="grid">
         <button data-action="xl-dup-mark">Tô vàng dòng trùng</button>
-        <button data-action="xl-dup-delete" class="danger">Xoá dòng trùng</button>
+        
       </div>
     </section>
 
@@ -51,7 +52,7 @@
         <button class="primary" data-action="xl-fx-check">Kiểm tra công thức</button>
         <button data-action="xl-fx-clear">Bỏ tô màu</button>
       </div>
-      <p class="hint small">“Bỏ tô màu” xoá màu nền của các ô đã tô ở lần kiểm tra gần nhất, kể cả màu nền cũ của chúng.</p>
+      <p class="hint small">Khôi phục màu nền đã lưu trong phiên hiện tại; không bảo toàn mọi kiểu tô hoặc định dạng có điều kiện.</p>
       <div id="fx-results"></div>
     </section>
 
@@ -74,15 +75,27 @@
       <button data-action="wd-stats">Thống kê tài liệu</button>
       <dl id="stats" hidden></dl>
       <div class="grid">
-        <button data-action="wd-date-short">Chèn 25/11/2026</button>
+        <button data-action="wd-date-short">Chèn ngày hiện tại</button>
         <button data-action="wd-date-long">Chèn “Ngày … tháng … năm …”</button>
       </div>
     </section>
+    <section data-host="Excel"><h2>Rà soát dữ liệu nhiều sheet</h2><p class="hint">Chỉ đọc, bỏ qua sheet ẩn. Giới hạn 100.000 ô mỗi vùng; kết quả tối đa 10.000.</p><label class="check"><input id="audit-all" type="checkbox" checked> Tất cả sheet hiện</label><input id="audit-query" placeholder="Từ khoá / công thức"><div class="grid"><button data-action="audit-search">Tìm toàn workbook</button><button data-action="audit-duplicate">Dòng trùng</button><button data-action="audit-formula">Sai / thiếu công thức</button><button data-action="audit-errors">Lỗi #REF!, #N/A…</button><button data-action="audit-blank">Ô trống</button><button data-action="xl-sheet-list">Danh sách sheet</button></div></section>
+    <section data-host="Excel"><h2>Định dạng và thống kê</h2><div class="grid"><button data-action="xl-format">Wrap + Middle Align</button><button data-action="xl-autofit">AutoFit cột</button><button data-action="xl-summary">Tổng, đếm, trung bình</button></div></section>
+    <section data-host="Word"><h2>Tìm kiếm và mẫu văn bản</h2><input id="wd-find-query" placeholder="Từ khoá"><button data-action="wd-find-count">Đếm vị trí tìm thấy</button><textarea id="wd-template" rows="5" placeholder="Nội dung mẫu báo cáo, biên bản..."></textarea><button data-action="wd-insert-template">Chèn mẫu</button></section>
+<section data-host="Excel"><h2>Chuyển đổi dữ liệu</h2><p class="hint">Chọn vùng dữ liệu. Bỏ qua mã có số 0 đầu; ngày chuyển thành văn bản ISO yyyy-mm-dd.</p><select id="g-number-mode"><option value="vi">Việt Nam: 1.234,56</option><option value="en">Quốc tế: 1,234.56</option></select><button data-action="g-number">Text thành Number</button><button data-action="g-date">Chuẩn hóa ngày</button><button data-action="g-fill">Điền ô trống theo dòng trên</button><button data-action="g-freeze">Công thức thành giá trị</button></section>
+<section data-host="Excel"><h2>Tách và ghép cột</h2><p class="hint">Chọn vùng nguồn, nhập ô đích trống trên cùng sheet.</p><input id="g-sep" placeholder="Ký tự phân tách" value=";"><input id="g-dest" placeholder="Ô đích, ví dụ H2" value=""><button data-action="g-split">Tách cột</button><button data-action="g-join">Ghép cột</button></section>
+<section data-host="Excel"><h2>So sánh và kiểm tra tham chiếu</h2><input id="g-other-sheet" placeholder="Sheet đối chiếu (trống = sheet hiện tại)" value=""><input id="g-other-range" placeholder="Vùng đối chiếu, ví dụ A2:B10" value=""><button data-action="g-compare">So sánh giá trị hai vùng</button><button data-action="g-sequence">Kiểm tra số thứ tự</button><input id="g-expected" placeholder="Tên sheet tham chiếu dự kiến (tuỳ chọn)" value=""><button data-action="g-refs">Kiểm tra tham chiếu và liên kết ngoài</button><button data-action="g-report">Tạo sheet báo cáo có liên kết</button></section>
+<section data-host="Excel"><h2>Quản lý sheet và hàng</h2><p class="hint">Nhập tên sheet mỗi dòng; đổi tên theo tiền tố + số thứ tự. Chèn hàng giữa các nhóm trong vùng chọn.</p><textarea id="g-sheets" rows="4" placeholder="Sheet1&#10;Sheet2"></textarea><input id="g-prefix" placeholder="Tiền tố đổi tên" value=""><input id="g-step" placeholder="Số dòng mỗi nhóm" value="1"><button data-action="g-insert">Chèn hàng trống</button><button data-action="g-merge">Gộp giá trị các sheet</button><button data-action="g-index">Tạo mục lục</button><button data-action="g-rename">Đổi tên hàng loạt</button><button data-action="g-sort">Sắp xếp theo tên</button><button data-action="g-hide">Ẩn sheet đã nhập</button><button data-action="g-unhide">Hiện sheet đã nhập</button><button data-action="g-copy">Sao chép sheet</button><button data-action="g-sheetstats">Thống kê kích thước sheet</button><button data-action="g-save">Lưu tùy chọn</button><button data-action="g-load">Nạp tùy chọn</button></section>
+<section data-host="Word"><h2>Định dạng văn bản phổ thông</h2><label class="check"><input id="g-word-all" type="checkbox"> Toàn bộ nội dung chính</label><input id="g-font" placeholder="Tên font" value="Times New Roman"><input id="g-fontsize" placeholder="Cỡ chữ" value="13"><input id="g-spacing" placeholder="Giãn dòng (pt)" value="18"><select id="g-align"><option value="Left">Căn trái</option><option value="Centered">Căn giữa</option><option value="Right">Căn phải</option><option value="Justified">Căn đều</option></select><button data-action="g-word-font">Chuẩn hóa font</button><button data-action="g-word-paragraph">Căn đoạn và giãn dòng</button><button data-action="g-word-admin">Mẫu định dạng hành chính cơ bản</button><button data-action="g-word-tables">Định dạng bảng</button><button data-action="g-word-punct">Rà soát khoảng trắng và dấu câu</button></section>
+<section data-host="Word"><h2>Số tiền và thư viện mẫu</h2><select id="g-word-number"><option value="vi">Việt Nam: 1.234,56</option><option value="en">Quốc tế: 1,234.56</option></select><button data-action="g-word-money">Chèn số tiền bằng chữ</button><select id="g-template"><option value="daily">Báo cáo công việc</option><option value="minutes">Biên bản cuộc họp</option></select><button data-action="g-word-template">Chèn mẫu phổ thông</button></section>
+    <section id="report-section"><h2>Kết quả rà soát</h2><button data-action="export-csv">Xuất CSV</button><div id="extra-results"></div></section>
   </main>
 
   <p id="status" role="status" aria-live="polite"></p>
 
   <script src="textutils.js"></script>
+  <script src="extra.js"></script>
+  <script src="general.js"></script>
   <script src="taskpane.js"></script>
 </body>
 </html>

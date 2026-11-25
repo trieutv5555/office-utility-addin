@@ -1,6 +1,9 @@
 /* Tiện ích văn phòng – taskpane dùng chung cho Excel và Word (Office.js). */
 const { numberToWords, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers } = TextUtils;
 let HOST = null;
+let busy = false;
+const MAX_CELLS = 100000;
+function guard(r) { if (r.rowCount * r.columnCount > MAX_CELLS) throw new Error("Vùng quá lớn; hãy chọn tối đa 100.000 ô mỗi lần."); }
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -16,19 +19,20 @@ function setStatus(msg, isError) {
 function excelTransform(fn) {
   return Excel.run(async (ctx) => {
     const range = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
-    range.load(['formulas', 'address']);
+    range.load(['formulas', 'address', 'rowCount', 'columnCount', 'valueTypes']);
     await ctx.sync();
     if (range.isNullObject) return 'Vùng chọn đang trống.';
+    guard(range);
     let changed = 0;
-    const out = range.formulas.map((row) =>
-      row.map((v) => {
-        if (typeof v !== 'string' || v.startsWith('=')) return v;
-        const n = fn(v);
-        if (n !== v) changed++;
-        return n;
-      })
-    );
-    if (changed) range.formulas = out;
+    const edits = [];
+    range.formulas.forEach((row,r) => row.forEach((v,c) => {
+      if (typeof v !== 'string' || v.startsWith('=') || range.valueTypes[r][c] !== 'String') return;
+      const n = fn(v);
+      if (n !== v) edits.push([r,c,n]);
+    }));
+    if (edits.length > 5000) throw new Error('Chia nhỏ vùng chọn: tối đa 5.000 ô sửa mỗi lần.');
+    if (edits.length && !confirm(`Sửa ${edits.length} ô văn bản? Hãy sao lưu trước khi thực hiện.`)) return 'Đã huỷ.';
+    edits.forEach(([r,c,n]) => { range.getCell(r,c).values = [[/^[=+\-@]/.test(n) ? "'"+n : n]]; changed++; });
     await ctx.sync();
     return changed ? `Đã sửa ${changed} ô (${range.address}).` : 'Không có ô nào cần sửa.';
   });
@@ -41,14 +45,15 @@ function excelNumbersToWords(withCurrency) {
     await ctx.sync();
     if (range.isNullObject) return 'Vùng chọn đang trống.';
     if (range.columnCount > 1) throw new Error('Chỉ chọn một cột số để tránh ghi đè dữ liệu bên cạnh.');
-    let count = 0;
-    range.values.forEach((row, r) => {
-      const v = row[0];
-      if (typeof v === 'number') {
-        range.getCell(r, 0).getOffsetRange(0, 1).values = [[numberToWords(v, withCurrency)]];
-        count++;
-      }
-    });
+    const dest = range.getOffsetRange(0,1);
+    dest.load(['values','formulas']);
+    await ctx.sync();
+    const rows = range.values.map((row,r) => [row[0],r]).filter(([v]) => typeof v === 'number');
+    if (rows.some(([,r]) => dest.values[r][0] !== '' || dest.formulas[r][0] !== '')) throw new Error('Cột kết quả có dữ liệu hoặc công thức. Hãy để trống các ô đích.');
+    if (rows.length > 5000) throw new Error('Tối đa 5.000 số mỗi lần.');
+    if (rows.length && !confirm(`Ghi ${rows.length} kết quả vào cột bên phải? Số lẻ được làm tròn.`)) return 'Đã huỷ.';
+    rows.forEach(([v,r]) => dest.getCell(r,0).values = [[numberToWords(v,withCurrency)]]);
+    const count = rows.length;
     await ctx.sync();
     return count ? `Đã đọc ${count} số thành chữ.` : 'Không tìm thấy ô số nào trong vùng chọn.';
   });
@@ -63,6 +68,7 @@ function excelDuplicates(mode) {
     const seen = new Set();
     const dups = [];
     range.values.forEach((row, i) => {
+      if (row.every(v => v === '')) return;
       const key = JSON.stringify(row.map((v) => (typeof v === 'string' ? v.trim().toLowerCase() : v)));
       if (seen.has(key)) dups.push(i);
       else seen.add(key);
@@ -71,7 +77,7 @@ function excelDuplicates(mode) {
     if (mode === 'mark') {
       dups.forEach((i) => { range.getRow(i).format.fill.color = '#FFF2A8'; });
     } else {
-      dups.reverse().forEach((i) => range.getRow(i).getEntireRow().delete(Excel.DeleteShiftDirection.up));
+      return 'Đã vô hiệu hoá xoá cả hàng để bảo vệ dữ liệu ngoài vùng chọn. Dùng báo cáo dòng trùng.';
     }
     await ctx.sync();
     return mode === 'mark' ? `Đã tô vàng ${dups.length} dòng trùng.` : `Đã xoá ${dups.length} dòng trùng.`;
@@ -80,7 +86,7 @@ function excelDuplicates(mode) {
 
 /* ---------- Excel: kiểm tra công thức bất thường trong cột ---------- */
 
-const FX_MAX_SHOWN = 50;
+const FX_MAX_SHOWN = 500;
 let lastFlagged = null; // { sheet, addrs } của lần tô màu gần nhất
 
 function excelCheckFormulas(highlight, manual) {
@@ -96,7 +102,7 @@ function excelCheckFormulas(highlight, manual) {
     const flagged = [];
     for (let c = 0; c < used.columnCount; c++) {
       const letter = columnLetter(used.columnIndex + c);
-      const res = findFormulaOutliers(used.formulasR1C1.map((r) => r[c]), { manual });
+      const res = findFormulaOutliers(used.formulasR1C1.map((r) => r[c]), { manual, blank: true });
       if (res.total === 0) continue; // cột không có công thức thì bỏ qua
       const addrOf = (i) => letter + (used.rowIndex + i + 1);
       const rep = { letter, status: res.status, total: res.total };
@@ -118,8 +124,14 @@ function excelCheckFormulas(highlight, manual) {
       return 'Vùng chọn không có công thức nào.';
     }
     if (highlight && flagged.length) {
+      if (lastFlagged) throw new Error('Hãy hoàn nguyên màu lần kiểm tra trước.');
+      if (flagged.length > 2000) throw new Error('Quá 2.000 ô lỗi; hãy tắt tô màu.');
+      const fills = flagged.map(a => sheet.getRange(a).format.fill);
+      fills.forEach(f => f.load('color'));
+      await ctx.sync();
+      const colors = fills.map(f => f.color);
       flagged.forEach((a) => { sheet.getRange(a).format.fill.color = '#FFC7CE'; });
-      lastFlagged = { sheet: sheet.name, addrs: flagged };
+      lastFlagged = { sheet: sheet.name, addrs: flagged, colors };
     }
     await ctx.sync();
     renderFormulaReport(reports, sheet.name);
@@ -155,7 +167,7 @@ function renderFormulaReport(reports, sheetName) {
       const a = document.createElement('strong');
       a.textContent = it.addr;
       const k = document.createElement('span');
-      k.textContent = it.kind === 'formula' ? 'Công thức khác' : 'Giá trị nhập tay';
+      k.textContent = it.kind === 'formula' ? 'Công thức khác' : it.kind === 'blank' ? 'Ô trống' : 'Giá trị nhập tay';
       const f = document.createElement('code');
       f.textContent = it.text;
       b.title = it.text;
@@ -176,7 +188,9 @@ function excelClearFlags() {
   if (!lastFlagged) return Promise.resolve('Chưa có ô nào được tô màu trong phiên này.');
   return Excel.run(async (ctx) => {
     const ws = ctx.workbook.worksheets.getItem(lastFlagged.sheet);
-    lastFlagged.addrs.forEach((a) => ws.getRange(a).format.fill.clear());
+    const fills = lastFlagged.addrs.map(a => ws.getRange(a).format.fill);
+    fills.forEach(f => f.load('color')); await ctx.sync();
+    fills.forEach((f,i) => { if (String(f.color).toUpperCase() !== '#FFC7CE') return; const old = lastFlagged.colors[i]; if (old) f.color = old; else f.clear(); });
     await ctx.sync();
     const n = lastFlagged.addrs.length;
     lastFlagged = null;
@@ -203,6 +217,7 @@ function wordSelectionTransform(fn) {
     if (!sel.text) return 'Hãy bôi đen đoạn văn bản cần xử lý.';
     const next = fn(sel.text);
     if (next === sel.text) return 'Không có gì cần sửa.';
+    if (!confirm('Thay văn bản đã chọn có thể làm mất định dạng từng phần. Tiếp tục?')) return 'Đã huỷ.';
     sel.insertText(next, 'Replace');
     await ctx.sync();
     return 'Đã cập nhật đoạn văn bản đang chọn.';
@@ -211,6 +226,7 @@ function wordSelectionTransform(fn) {
 
 function wordClean() {
   return Word.run(async (ctx) => {
+    if (!confirm('Dọn khoảng trắng và đoạn trống toàn tài liệu? Có thể ảnh hưởng bố cục.')) return 'Đã huỷ.';
     const body = ctx.document.body;
     const spaces = body.search('[ ]{2,}', { matchWildcards: true });
     spaces.load('items');
@@ -237,18 +253,13 @@ function wordClean() {
 
 function wordReplace(pairs, matchCase) {
   return Word.run(async (ctx) => {
-    const found = pairs.map(([find]) => {
-      const res = ctx.document.body.search(find, { matchCase });
-      res.load('items');
-      return res;
-    });
-    await ctx.sync();
+    if (!confirm('Thay thế lần lượt từng cặp trên toàn bộ nội dung chính? Kết quả cặp trước có thể khớp cặp sau.')) return 'Đã huỷ.';
     let total = 0;
-    found.forEach((res, i) => {
-      res.items.forEach((r) => r.insertText(pairs[i][1], 'Replace'));
-      total += res.items.length;
-    });
-    await ctx.sync();
+    for (const [find,replacement] of pairs) {
+      const res = ctx.document.body.search(find,{matchCase}); res.load('items'); await ctx.sync();
+      res.items.forEach(r => r.insertText(replacement,'Replace')); total += res.items.length;
+      await ctx.sync();
+    }
     return `Đã thay ${total} vị trí (${pairs.length} cặp).`;
   });
 }
@@ -302,6 +313,8 @@ function parsePairs(text) {
 /* ---------- Điều phối ---------- */
 
 const ACTIONS = {
+  ...Extra.actions,
+  ...General.actions,
   trim: () => (HOST === 'Excel' ? excelTransform(TEXT_OPS.trim) : wordSelectionTransform(TEXT_OPS.trim)),
   upper: () => (HOST === 'Excel' ? excelTransform(TEXT_OPS.upper) : wordSelectionTransform(TEXT_OPS.upper)),
   lower: () => (HOST === 'Excel' ? excelTransform(TEXT_OPS.lower) : wordSelectionTransform(TEXT_OPS.lower)),
@@ -325,8 +338,9 @@ const ACTIONS = {
 
 async function run(btn) {
   const action = ACTIONS[btn.dataset.action];
-  if (!action) return;
-  btn.disabled = true;
+  if (!action || busy) return;
+  busy = true;
+  document.querySelectorAll('[data-action]').forEach(b => b.disabled = true);
   setStatus('Đang xử lý…');
   try {
     setStatus(await action());
@@ -334,7 +348,8 @@ async function run(btn) {
     console.error(e);
     setStatus('Không thực hiện được: ' + (e.message || e), true);
   } finally {
-    btn.disabled = false;
+    busy = false;
+    document.querySelectorAll('[data-action]').forEach(b => b.disabled = false);
   }
 }
 
@@ -347,6 +362,7 @@ Office.onReady((info) => {
     return;
   }
   document.documentElement.dataset.host = HOST;
+  Extra.init(HOST);
   $('#host-label').textContent = HOST === 'Excel' ? 'Đang chạy trong Excel' : 'Đang chạy trong Word';
   document.querySelectorAll('button[data-action]').forEach((b) => b.addEventListener('click', () => run(b)));
   $('#fx-results').addEventListener('click', (e) => {

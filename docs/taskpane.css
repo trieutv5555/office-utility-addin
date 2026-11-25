@@ -95,3 +95,10 @@ button.fx-item code {
 
 #status { min-height: 20px; margin: 12px 0 0; font-size: 13px; }
 #status.error { color: var(--danger); }
+input:not([type=checkbox]) { width:100%; padding:8px; margin:6px 0; border:1px solid var(--line); border-radius:5px; font:inherit; }
+summary { font-weight:600; cursor:pointer; padding:5px 0; }
+details[open] summary { margin-bottom:10px; }
+#extra-results { max-height:420px; overflow:auto; }
+#status { position:sticky; bottom:0; background:var(--bg); padding:8px 0; border-top:1px solid var(--line); }
+select { width:100%; padding:8px; margin:6px 0; border:1px solid var(--line); border-radius:5px; font:inherit; }
+section details > button { width:100%; margin:3px 0; }

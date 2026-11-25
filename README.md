@@ -41,3 +41,15 @@ Sửa mã trong docs, chạy UPLOAD_ADDIN.bat (cần Git và quyền push). Nế
 - Các hàm xử lý chữ trong Excel bỏ qua ô chứa công thức.
 - Kiểm tra công thức so sánh theo kiểu R1C1 và lấy công thức chiếm quá nửa số công thức của cột làm chuẩn. Cột chưa đủ 3 công thức, hoặc không có công thức nào chiếm đa số, sẽ được bỏ qua. Dòng tổng (ví dụ SUM ở cuối cột) cũng sẽ được liệt kê vì khác công thức chuẩn, bạn tự đánh giá là hợp lệ hay không.
 - Đọc số thành chữ hỗ trợ tối đa 15 chữ số, làm tròn đến số nguyên.
+
+## Bản cải tiến
+- Thêm tìm kiếm workbook, kiểm tra lỗi Excel, dòng trùng từng sheet, ô trống và công thức sai/thiếu; mặc định bỏ qua sheet ẩn. Báo cáo có thể nhảy đến ô và xuất CSV (tuỳ host có cho tải xuống).
+- Thêm thống kê vùng chọn, danh sách sheet, Wrap Text/Middle Align/AutoFit; Word thêm đếm từ khoá và chèn mẫu.
+- Tắt xoá cả hàng trùng để bảo vệ dữ liệu; số thành chữ từ chối ghi đè; xác nhận thao tác sửa dữ liệu; khoá nút trong lúc chạy.
+- Giữ nguyên manifest để cập nhật giao diện mà không cần đăng ký lại. Không thay đổi phiên bản manifest.
+- Rà soát theo vùng đã dùng hoặc vùng chọn; tối đa 100.000 ô/vùng, 10.000 kết quả, hiển thị 200 trong báo cáo chung. Kiểm tra công thức theo đa số chỉ là gợi ý, không tự sửa. Không hỗ trợ Office 2010.
+- Kiểm thử: node --check cho JS và 3 kiểm thử hàm thuần. Chưa kiểm thử Office thật, CSV tải xuống và khả năng tương thích từng bản Office. Màu nền phục hồi gần đúng trong cùng phiên, không bảo đảm màu theo theme/pattern. Hãy dùng bản sao dữ liệu khi thử.
+
+## Bản mở rộng tiện ích phổ thông
+
+Bản này không chứa kiểm tra sản lượng, lương, đơn giá hay quy tắc công ty. Chép các file trong gói cập nhật vào repository hiện có, chạy UPLOAD_ADDIN.bat; giữ manifest cũ. Công cụ Excel có giới hạn 100.000 ô/vùng, tối đa 5.000 ô ghi riêng lẻ mỗi lần; báo cáo lưu tối đa 10.000 kết quả. Chuyển ngày văn bản sang ISO dạng text, không đổi hệ ngày Excel. Gộp sheet theo thứ tự cột của vùng dùng, giữ mọi dòng (kể cả tiêu đề) và chỉ sao chép giá trị. Tham chiếu được nhận diện bằng mẫu công thức trực tiếp, không phân tích INDIRECT, tên định nghĩa, liên kết ẩn hoặc mọi trường hợp 3D. Kiểm tra số thứ tự theo thứ tự hiện tại, báo khoảng nhảy, giảm và trùng. Lưu tùy chọn cục bộ, không lưu nội dung tài liệu. Mẫu hành chính chỉ định dạng font và đoạn, không phải xác nhận tuân thủ thể thức pháp lý; chưa thay đổi lề trang. Chức năng bảng áp dụng kiểu bảng có sẵn. Kiểm thử cú pháp JS và 7 trường hợp phân tích số/ngày; chưa kiểm thử Office thực tế. Nên dùng bản sao tài liệu, nhất là thao tác chèn hàng, đổi tên, gộp và chuyển công thức.
