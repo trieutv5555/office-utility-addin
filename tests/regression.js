@@ -50,3 +50,22 @@ async function testAutoFit(){
   console.log('AutoFit simulation passed (all modes, current table, compatibility, cancel, empty).');
 }
 testAutoFit().catch(e=>{console.error(e);process.exitCode=1;});
+
+async function testMargins(){
+  const G=new Function('TextUtils','document',fs.readFileSync(require('node:path').join(root,'general.js'),'utf8')+'\nreturn General;')(U,{});
+  const raw={top:'2',bottom:'2',left:'3',right:'1,5'};
+  const m=G.marginPoints(raw);
+  assert.ok(Math.abs(m.leftMargin-85.03937)<0.001);
+  assert.throws(()=>G.marginPoints({...raw,left:''}));
+  assert.throws(()=>G.marginPoints({...raw,right:'6'}));
+  const p={orientation:'Landscape',paperSize:'Letter',load(){}};
+  const ctx={document:{sections:{items:[{pageSetup:p}],load(){}}},sync:async()=>{}};
+  await G.applyPageMargins(ctx,raw,false,()=>true,async()=>false);
+  assert.equal(p.paperSize,'Letter');
+  const result=await G.applyPageMargins(ctx,raw,false,()=>true,async()=>true);
+  assert.equal(p.paperSize,'A4');assert.equal(p.orientation,'Landscape');assert.equal(p.gutter,0);assert.equal(p.mirrorMargins,false);assert.equal(p.rightMargin,m.rightMargin);
+  assert.ok(result.includes('1/1'));
+  await assert.rejects(()=>G.applyPageMargins(ctx,raw,false,()=>false,async()=>true));
+  console.log('Page margins simulation passed.');
+}
+testMargins().catch(e=>{console.error(e);process.exitCode=1;});

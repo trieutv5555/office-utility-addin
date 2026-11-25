@@ -116,5 +116,44 @@ const General = (() => {
    return 'Đã AutoFit '+tables.length+' bảng Word: '+labels[mode]+(skipped?'; bỏ qua '+skipped+' bảng lồng':'')+'. Không xử lý đối tượng Excel liên kết.';
  }
  a['g-word-autofit']=()=>Word.run(c=>autoFitTables(c,val('g-fit-scope'),val('g-fit-mode'),(set,version)=>Office.context.requirements.isSetSupported(set,version),yes,$('#g-fit-normalize').checked));
- return {actions:a,parseNumber,autoFitTables,pageFitWidth};
+ function marginPoints(raw){
+   const out={};
+   for(const k of ['top','bottom','left','right']){
+     const s=String(raw[k]??'').trim().replace(',','.');
+     if(!/^\d+(?:\.\d+)?$/.test(s))throw Error('Nhập lề hợp lệ theo cm.');
+     const n=Number(s);
+     if(n<0.5||n>5)throw Error('Mỗi lề phải từ 0,5 đến 5 cm.');
+     out[k+'Margin']=n*72/2.54;
+   }
+   return out;
+ }
+ async function applyPageMargins(c,raw,fit,supports,confirm){
+   if(!supports('WordApiDesktop','1.3'))throw Error('Căn lề A4 yêu cầu WordApiDesktop 1.3.');
+   const margins=marginPoints(raw);
+   const sections=c.document.sections;sections.load('items');await c.sync();
+   if(!sections.items.length)return 'Không tìm thấy section.';
+   const setups=sections.items.map(s=>s.pageSetup);
+   for(const p of setups)p.load('orientation');
+   await c.sync();
+   if(!await confirm('Đặt khổ A4 và lề đã nhập cho toàn bộ '+setups.length+' section, giữ hướng giấy hiện tại, bỏ lề đóng gáy và lề đối xứng'+(fit?', sau đó AutoFit bảng Word':'')+'? Bố cục và số trang có thể thay đổi.'))return 'Đã huỷ.';
+   for(const p of setups){
+     const orientation=p.orientation;
+     p.paperSize='A4';p.orientation=orientation;
+     p.mirrorMargins=false;p.gutter=0;
+     for(const k of Object.keys(margins))p[k]=margins[k];
+   }
+   await c.sync();
+   for(const p of setups)p.load('paperSize,topMargin,bottomMargin,leftMargin,rightMargin,gutter,mirrorMargins');
+   await c.sync();
+   const verified=setups.filter(p=>p.paperSize==='A4'&&p.gutter===0&&p.mirrorMargins===false&&Object.keys(margins).every(k=>Math.abs(p[k]-margins[k])<=0.1)).length;
+   let result='Đã đặt lề A4: '+verified+'/'+setups.length+' section được xác minh.';
+   if(fit){
+     if(verified!==setups.length)return result+' Chưa AutoFit vì có section chưa đạt.';
+     try{result+=' '+await autoFitTables(c,'all','Window',supports,async()=>true,true);}
+     catch(e){result+=' Lề đã được áp dụng; AutoFit chưa hoàn tất: '+(e.message||e);}
+   }
+   return result;
+ }
+ a['g-word-margins']=()=>Word.run(c=>applyPageMargins(c,Object.fromEntries(['top','bottom','left','right'].map(k=>[k,val('g-margin-'+k)])),$('#g-margin-fit').checked,(set,version)=>Office.context.requirements.isSetSupported(set,version),yes));
+ return {actions:a,parseNumber,autoFitTables,pageFitWidth,marginPoints,applyPageMargins};
 })();
