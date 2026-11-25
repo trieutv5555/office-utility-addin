@@ -5,7 +5,7 @@ Tiện ích tiếng Việt dành cho Microsoft Excel và Word, giúp xử lý d�
 ## Chức năng chính
 
 - **Excel:** đọc số thành chữ, tìm dòng trùng, kiểm tra công thức và lỗi dữ liệu, tìm kiếm nhiều sheet, so sánh vùng, chuyển đổi dữ liệu, gộp sheet và báo cáo có liên kết.
-- **Word:** chuẩn hóa văn bản, dọn khoảng trắng, thay thế hàng loạt, rà soát dấu câu và đọc số tiền thành chữ.
+- **Word:** chuẩn hóa văn bản, dọn khoảng trắng, thay thế hàng loạt, rà soát dấu câu, đọc số tiền thành chữ và AutoFit bảng hàng loạt.
 
 ## Sử dụng
 

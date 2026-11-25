@@ -55,5 +55,30 @@ const General = (() => {
  a['g-refs']=sel(async(c,r)=>{const mask=await getFormulaMask(c,r);let out=[];const expected=val('g-expected');r.formulas.forEach((row,i)=>row.forEach((f,j)=>{if(!(mask?mask[i][j]:isFx(f,r.values[i][j])))return;const stripped=f.replace(/"(?:[^"]|"")*"/g,'');if(/\[[^\]]+\][^!]*!/.test(stripped))out.push(item(r,i,j,'Có thể có liên kết ngoài',f));const refs=[...stripped.matchAll(/(?:'((?:[^']|'')+)'|([\p{L}\p{N}_.]+))!/gu)].map(m=>(m[1]||m[2]).replace(/''/g,"'"));if(expected&&refs.some(n=>n.toLowerCase()!==expected.toLowerCase()))out.push(item(r,i,j,'Tham chiếu khác sheet dự kiến',f));}));return display(out);});
  a['g-word-money']=()=>Word.run(async c=>{const r=c.document.getSelection();r.load('text');await c.sync();const n=parseNumber(r.text,val('g-word-number'));if(n===null||!Number.isSafeInteger(n))throw Error('Chọn một số tiền nguyên hợp lệ.');const text=TextUtils.numberToWords(n,true);if(Math.abs(n)>999999999999999)throw Error('Số vượt giới hạn 15 chữ số.');if(!await yes('Chèn số tiền bằng chữ sau vùng chọn'))return 'Đã huỷ.';r.insertText(' ('+text+')','End');await c.sync();return 'Đã chèn.';});
  a['g-word-punct']=()=>Word.run(async c=>{const r=$('#g-word-all').checked?c.document.body:c.document.getSelection();r.load('text');await c.sync();const out=[];r.text.split(/\r?\n|\r/).forEach((line,i)=>{if(/ {2,}/.test(line))out.push({kind:'Khoảng trắng',text:`Đoạn ${i+1}: ${line.slice(0,200)}`});if(/ +[,;:!?]/.test(line))out.push({kind:'Khoảng trắng trước dấu câu',text:`Đoạn ${i+1}: ${line.slice(0,200)}`});if(/[,;!?](?=\p{L})/u.test(line))out.push({kind:'Có thể thiếu khoảng trắng',text:`Đoạn ${i+1}: ${line.slice(0,200)}`});});return display(out);});
- return {actions:a,parseNumber};
+ async function autoFitTables(c,scope,mode,supports,confirm){
+   const labels={Window:'vừa chiều rộng trang',Content:'vừa nội dung',FixedSize:'cố định chiều rộng cột'};
+   if(!Object.prototype.hasOwnProperty.call(labels,mode)||!['all','current'].includes(scope))throw Error('Tùy chọn AutoFit không hợp lệ.');
+   const desktop=supports('WordApiDesktop','1.4'),base=supports('WordApi','1.3');
+   if(!base)throw Error('AutoFit bảng yêu cầu WordApi 1.3.');
+   if(mode!=='Window'&&!desktop)throw Error('Chế độ này yêu cầu WordApiDesktop 1.4. Hãy cập nhật Word hoặc chọn Vừa chiều rộng trang.');
+   let tables;
+   if(scope==='all'){
+     const collection=c.document.body.tables;
+     collection.load('items');await c.sync();tables=collection.items.slice();
+   }else{
+     const parent=c.document.getSelection().parentTableOrNullObject;
+     parent.load('isNullObject');await c.sync();tables=parent.isNullObject?[]:[parent];
+   }
+   if(!tables.length)return scope==='all'?'Không có bảng trong nội dung chính.':'Đặt con trỏ bên trong bảng cần chỉnh.';
+   if(!await confirm('Áp dụng '+labels[mode]+' cho '+tables.length+' bảng? Chỉ thay đổi bố cục bảng.'))return 'Đã huỷ.';
+   // Use the stable WordApi method for Window, and native desktop AutoFit for the other modes.
+   for(const table of tables){
+     if(mode==='Window')table.autoFitWindow();
+     else table.autoFitBehavior(mode);
+   }
+   await c.sync();
+   return 'Đã AutoFit '+tables.length+' bảng: '+labels[mode]+'.';
+ }
+ a['g-word-autofit']=()=>Word.run(c=>autoFitTables(c,val('g-fit-scope'),val('g-fit-mode'),(set,version)=>Office.context.requirements.isSetSupported(set,version),yes));
+ return {actions:a,parseNumber,autoFitTables};
 })();

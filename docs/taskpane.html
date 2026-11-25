@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tiện ích văn phòng</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link rel="stylesheet" href="taskpane.css?v=1.0.1">
+  <link rel="stylesheet" href="taskpane.css?v=1.0.2">
 </head>
 <body>
   <header>
     <h1>Tiện ích văn phòng</h1>
-    <p id="app-version">Phiên bản 1.0.1</p>
+    <p id="app-version">Phiên bản 1.0.2</p>
     <p id="host-label">Đang kết nối với Office…</p>
   </header>
 
@@ -81,15 +81,20 @@
 <section data-host="Excel"><h2>So sánh và kiểm tra tham chiếu</h2><input id="g-other-sheet" placeholder="Sheet đối chiếu (trống = sheet hiện tại)" value=""><input id="g-other-range" placeholder="Vùng đối chiếu, ví dụ A2:B10" value=""><button data-action="g-compare">So sánh giá trị hai vùng</button><button data-action="g-sequence">Kiểm tra số thứ tự</button><input id="g-expected" placeholder="Tên sheet tham chiếu dự kiến (tuỳ chọn)" value=""><button data-action="g-refs">Kiểm tra tham chiếu và liên kết ngoài</button><button data-action="g-report">Tạo sheet báo cáo có liên kết</button></section>
 <section data-host="Excel"><h2>Tổng hợp sheet</h2><p class="hint">Nhập tên sheet, mỗi dòng một tên. Gộp chỉ lấy giá trị.</p><textarea id="g-sheets" rows="4" placeholder="Sheet1&#10;Sheet2"></textarea><button data-action="g-merge">Gộp giá trị các sheet</button><button data-action="g-index">Tạo mục lục</button></section>
 <section data-host="Word"><h2>Rà soát văn bản</h2><label class="check"><input id="g-word-all" type="checkbox"> Toàn bộ nội dung chính</label><button data-action="g-word-punct">Rà soát khoảng trắng và dấu câu</button></section>
+<section data-host="Word"><h2>AutoFit bảng</h2>
+<label for="g-fit-scope">Phạm vi</label><select id="g-fit-scope"><option value="all" selected>Toàn bộ bảng trong nội dung chính</option><option value="current">Bảng tại vị trí con trỏ</option></select>
+<label for="g-fit-mode">Chế độ</label><select id="g-fit-mode"><option value="Window" selected>Vừa chiều rộng trang</option><option value="Content">Vừa nội dung</option><option value="FixedSize">Cố định chiều rộng cột</option></select>
+<p class="hint">Không xử lý bảng ở đầu trang, chân trang hoặc bảng lồng riêng. Hai chế độ vừa nội dung và cố định cần WordApiDesktop 1.4.</p>
+<button class="primary" data-action="g-word-autofit">Áp dụng AutoFit</button></section>
 <section data-host="Word"><h2>Số tiền thành chữ</h2><select id="g-word-number"><option value="vi">Việt Nam: 1.234,56</option><option value="en">Quốc tế: 1,234.56</option></select><button data-action="g-word-money">Chèn số tiền bằng chữ</button></section>
     <section id="report-section"><h2>Kết quả rà soát</h2><button data-action="export-csv">Xuất CSV</button><div id="extra-results"></div></section>
   </main>
 
   <p id="status" role="status" aria-live="polite"></p>
 
-  <script src="textutils.js?v=1.0.1"></script>
-  <script src="extra.js?v=1.0.1"></script>
-  <script src="general.js?v=1.0.1"></script>
-  <script src="taskpane.js?v=1.0.1"></script>
+  <script src="textutils.js?v=1.0.2"></script>
+  <script src="extra.js?v=1.0.2"></script>
+  <script src="general.js?v=1.0.2"></script>
+  <script src="taskpane.js?v=1.0.2"></script>
 </body>
 </html>

@@ -19,3 +19,22 @@ function test(){
   console.log('Regression checks passed (10 assertions; 4 syntax checks).');
 }
 test();
+
+async function testAutoFit(){
+  const G=new Function('TextUtils','document',fs.readFileSync(require('node:path').join(root,'general.js'),'utf8')+'\nreturn General;')(U,{});
+  const calls=[];
+  const table=()=>({load(){},isNullObject:false,autoFitWindow(){calls.push('Window')},autoFitBehavior(m){calls.push(m)}});
+  const first=table(),second=table(),collection={items:[first,second],load(){}};
+  const ctx={document:{body:{tables:collection},getSelection:()=>({parentTableOrNullObject:second})},sync:async()=>{}};
+  const desktop=()=>true,baseOnly=(set)=>set==='WordApi',confirm=async()=>true;
+  for(const mode of ['Window','Content','FixedSize']){
+    calls.length=0;await G.autoFitTables(ctx,'all',mode,desktop,confirm);assert.deepEqual(calls,[mode,mode]);
+  }
+  calls.length=0;await G.autoFitTables(ctx,'current','Content',desktop,confirm);assert.deepEqual(calls,['Content']);
+  calls.length=0;await G.autoFitTables(ctx,'all','Window',baseOnly,confirm);assert.deepEqual(calls,['Window','Window']);
+  calls.length=0;await G.autoFitTables(ctx,'all','Window',desktop,async()=>false);assert.equal(calls.length,0);
+  await assert.rejects(()=>G.autoFitTables(ctx,'all','FixedSize',baseOnly,confirm));assert.equal(calls.length,0);
+  collection.items=[];await G.autoFitTables(ctx,'all','Window',desktop,confirm);assert.equal(calls.length,0);
+  console.log('AutoFit simulation passed (all modes, current table, compatibility, cancel, empty).');
+}
+testAutoFit().catch(e=>{console.error(e);process.exitCode=1;});
