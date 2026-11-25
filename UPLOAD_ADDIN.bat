@@ -18,7 +18,11 @@ git config --get user.email >nul 2>&1
 if errorlevel 1 (
  git config --local user.email "102889723+trieutv5555@users.noreply.github.com" || goto fail
 )
-copy /y manifest.xml docs\manifest.xml >nul || goto fail
+rem docs\manifest.xml is the only source manifest.
+if not exist "docs\manifest.xml" (
+ echo Missing docs\manifest.xml.
+ goto fail
+)
 git add -A || goto fail
 git diff --cached --quiet
 if errorlevel 2 goto fail
