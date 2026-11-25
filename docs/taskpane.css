@@ -102,3 +102,5 @@ details[open] summary { margin-bottom:10px; }
 #status { position:sticky; bottom:0; background:var(--bg); padding:8px 0; border-top:1px solid var(--line); }
 select { width:100%; padding:8px; margin:6px 0; border:1px solid var(--line); border-radius:5px; font:inherit; }
 section details > button { width:100%; margin:3px 0; }
+
+#app-version { margin: 2px 0 0; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
