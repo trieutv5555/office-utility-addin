@@ -120,29 +120,53 @@ function excelNumbersToWords(withCurrency) {
   });
 }
 
+function renderDuplicateRows(items){
+  const box=$('#duplicate-results');box.replaceChildren();
+  const note=document.createElement('p');note.className='hint';
+  note.textContent=items.length?'Đã tô '+items.length+' dòng trùng. Bấm vào dòng để tới ô đã tô.':'Không có dòng trùng.';
+  box.append(note);
+  for(const it of items.slice(0,200)){
+    const btn=document.createElement('button');btn.type='button';btn.className='fx-item';
+    btn.textContent=it.text;btn.title=it.sheet+'!'+it.addr;
+    btn.onclick=()=>{if(!busy)excelGoto(it.sheet,it.addr).catch(e=>setStatus(e.message,true));};
+    box.append(btn);
+  }
+  if(items.length>200){
+    const more=document.createElement('p');more.className='hint';
+    more.textContent='Hiện 200/'+items.length+' dòng. Xem đầy đủ bằng Xuất CSV hoặc Tạo sheet báo cáo ngay sau khi chạy.';
+    box.append(more);
+  }
+  Extra.show(items);
+}
 function excelDuplicates(mode) {
   return Excel.run(async (ctx) => {
-    const range = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
-    if(!await loadBounded(ctx,range,['values','formulas']))return 'Vùng chọn đang trống.';
-    const seen = new Set();
-    const dups = [];
-    range.values.forEach((row, i) => {
-      if (row.every(v => v === '')) return;
-      const key = TextUtils.duplicateKey(row);
-      if (seen.has(key)) dups.push(i);
-      else seen.add(key);
+    if(mode!=='mark')return 'Đã vô hiệu hoá xoá cả hàng để bảo vệ dữ liệu ngoài vùng chọn.';
+    const range=ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
+    const sheet=ctx.workbook.worksheets.getActiveWorksheet();
+    sheet.load('name');
+    $('#duplicate-results').replaceChildren();
+    Extra.show([]);
+    if(!await loadBounded(ctx,range,['values','formulas','rowIndex','columnIndex']))return 'Vùng chọn đang trống.';
+    const seen=new Map(),dups=[];
+    range.values.forEach((row,i)=>{
+      if(row.every(v=>v===''))return;
+      const key=TextUtils.duplicateKey(row);
+      if(seen.has(key))dups.push({i,first:seen.get(key)});
+      else seen.set(key,i);
     });
-    if (!dups.length) return 'Không có dòng trùng.';
-    if (mode === 'mark') {
-      if(dups.length>2000)throw Error('Quá 2.000 dòng trùng; dùng báo cáo thay cho tô màu.');
-      if(!await officeConfirm('Tô màu '+dups.length+' dòng trùng? Màu nền cũ sẽ bị thay đổi.'))return 'Đã huỷ.';
-      await assertUnchanged(ctx,range);
-      dups.forEach((i) => { range.getRow(i).format.fill.color = '#FFF2A8'; });
-    } else {
-      return 'Đã vô hiệu hoá xoá cả hàng để bảo vệ dữ liệu ngoài vùng chọn. Dùng báo cáo dòng trùng.';
-    }
+    if(!dups.length){renderDuplicateRows([]);return 'Không có dòng trùng.';}
+    if(dups.length>2000)throw Error('Quá 2.000 dòng trùng; dùng báo cáo thay cho tô màu.');
+    if(!await officeConfirm('Tô màu '+dups.length+' dòng trùng? Màu nền cũ sẽ bị thay đổi.'))return 'Đã huỷ.';
+    await assertUnchanged(ctx,range);
+    for(const {i} of dups)range.getRow(i).format.fill.color='#FFF2A8';
     await ctx.sync();
-    return mode === 'mark' ? `Đã tô vàng ${dups.length} dòng trùng.` : `Đã xoá ${dups.length} dòng trùng.`;
+    const col=columnLetter(range.columnIndex);
+    const items=dups.map(({i,first})=>{
+      const row=range.rowIndex+i+1,original=range.rowIndex+first+1;
+      return {sheet:sheet.name,addr:col+row,kind:'Dòng trùng đã tô',text:'Dòng '+row+' trùng dòng '+original};
+    });
+    renderDuplicateRows(items);
+    return 'Đã tô vàng '+items.length+' dòng trùng. Xem danh sách ngay dưới nút.';
   });
 }
 

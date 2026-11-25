@@ -72,3 +72,5 @@ Bản này không chứa kiểm tra sản lượng, lương, đơn giá hay quy 
 - Ngày tháng vẫn là ISO dạng văn bản; không dùng API Preview của hệ ngày 1900/1904. Khôi phục màu vẫn gần đúng, chưa bảo toàn theme/pattern.
 - Kiểm thử hồi quy: `node tests/regression.js` (không cần cài thư viện). Đây là test JS và mô phỏng, không thay thế kiểm thử Office thật.
 - Tài liệu: https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-multiple-ranges ; https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-ranges-dynamic-arrays ; https://learn.microsoft.com/en-us/javascript/api/word/word.range .
+
+- Tô vàng dòng trùng: hiển thị số dòng đã tô và dòng xuất hiện đầu tiên ngay dưới nút; bấm để tới ô, đồng thời cập nhật báo cáo chung để xuất CSV hoặc tạo sheet báo cáo. Hiển thị tối đa 200 dòng, lưu đủ tối đa 2.000 dòng đã tô.
