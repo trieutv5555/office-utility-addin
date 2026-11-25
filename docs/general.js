@@ -55,30 +55,66 @@ const General = (() => {
  a['g-refs']=sel(async(c,r)=>{const mask=await getFormulaMask(c,r);let out=[];const expected=val('g-expected');r.formulas.forEach((row,i)=>row.forEach((f,j)=>{if(!(mask?mask[i][j]:isFx(f,r.values[i][j])))return;const stripped=f.replace(/"(?:[^"]|"")*"/g,'');if(/\[[^\]]+\][^!]*!/.test(stripped))out.push(item(r,i,j,'Có thể có liên kết ngoài',f));const refs=[...stripped.matchAll(/(?:'((?:[^']|'')+)'|([\p{L}\p{N}_.]+))!/gu)].map(m=>(m[1]||m[2]).replace(/''/g,"'"));if(expected&&refs.some(n=>n.toLowerCase()!==expected.toLowerCase()))out.push(item(r,i,j,'Tham chiếu khác sheet dự kiến',f));}));return display(out);});
  a['g-word-money']=()=>Word.run(async c=>{const r=c.document.getSelection();r.load('text');await c.sync();const n=parseNumber(r.text,val('g-word-number'));if(n===null||!Number.isSafeInteger(n))throw Error('Chọn một số tiền nguyên hợp lệ.');const text=TextUtils.numberToWords(n,true);if(Math.abs(n)>999999999999999)throw Error('Số vượt giới hạn 15 chữ số.');if(!await yes('Chèn số tiền bằng chữ sau vùng chọn'))return 'Đã huỷ.';r.insertText(' ('+text+')','End');await c.sync();return 'Đã chèn.';});
  a['g-word-punct']=()=>Word.run(async c=>{const r=$('#g-word-all').checked?c.document.body:c.document.getSelection();r.load('text');await c.sync();const out=[];r.text.split(/\r?\n|\r/).forEach((line,i)=>{if(/ {2,}/.test(line))out.push({kind:'Khoảng trắng',text:`Đoạn ${i+1}: ${line.slice(0,200)}`});if(/ +[,;:!?]/.test(line))out.push({kind:'Khoảng trắng trước dấu câu',text:`Đoạn ${i+1}: ${line.slice(0,200)}`});if(/[,;!?](?=\p{L})/u.test(line))out.push({kind:'Có thể thiếu khoảng trắng',text:`Đoạn ${i+1}: ${line.slice(0,200)}`});});return display(out);});
- async function autoFitTables(c,scope,mode,supports,confirm){
+ // Explicit width is safe only for a single text column with known page geometry.
+ function pageFitWidth(p,columnCount){
+   if(columnCount!==1||![p.pageWidth,p.leftMargin,p.rightMargin,p.gutter].every(Number.isFinite))return null;
+   if(p.gutter<0||p.leftMargin<0||p.rightMargin<0||!['Left','Right','Top'].includes(p.gutterPosition))return null;
+   const width=p.pageWidth-p.leftMargin-p.rightMargin-(p.gutterPosition==='Top'?0:p.gutter);
+   return width>=36&&width<=2000?width:null;
+ }
+ async function autoFitTables(c,scope,mode,supports,confirm,normalize=false){
    const labels={Window:'vừa chiều rộng trang',Content:'vừa nội dung',FixedSize:'cố định chiều rộng cột'};
    if(!Object.prototype.hasOwnProperty.call(labels,mode)||!['all','current'].includes(scope))throw Error('Tùy chọn AutoFit không hợp lệ.');
-   const desktop=supports('WordApiDesktop','1.4'),base=supports('WordApi','1.3');
+   const desktop=supports('WordApiDesktop','1.4'),geometry=supports('WordApiDesktop','1.3'),base=supports('WordApi','1.3');
    if(!base)throw Error('AutoFit bảng yêu cầu WordApi 1.3.');
    if(mode!=='Window'&&!desktop)throw Error('Chế độ này yêu cầu WordApiDesktop 1.4. Hãy cập nhật Word hoặc chọn Vừa chiều rộng trang.');
    let tables;
    if(scope==='all'){
      const collection=c.document.body.tables;
-     collection.load('items');await c.sync();tables=collection.items.slice();
+     collection.load('items/nestingLevel');await c.sync();tables=collection.items.slice();
    }else{
      const parent=c.document.getSelection().parentTableOrNullObject;
-     parent.load('isNullObject');await c.sync();tables=parent.isNullObject?[]:[parent];
+     parent.load('nestingLevel');await c.sync();tables=parent.isNullObject?[]:[parent];
    }
-   if(!tables.length)return scope==='all'?'Không có bảng trong nội dung chính.':'Đặt con trỏ bên trong bảng cần chỉnh.';
-   if(!await confirm('Áp dụng '+labels[mode]+' cho '+tables.length+' bảng? Chỉ thay đổi bố cục bảng.'))return 'Đã huỷ.';
-   // Use the stable WordApi method for Window, and native desktop AutoFit for the other modes.
-   for(const table of tables){
-     if(mode==='Window')table.autoFitWindow();
-     else table.autoFitBehavior(mode);
+   const skipped=tables.filter(t=>t.nestingLevel!==1).length;
+   tables=tables.filter(t=>t.nestingLevel===1);
+   if(!tables.length)return skipped?'Không xử lý riêng bảng lồng.':scope==='all'?'Không có bảng trong nội dung chính.':'Đặt con trỏ bên trong bảng cần chỉnh.';
+   const strict=mode==='Window'&&normalize;
+   const plans=tables.map((table,i)=>({table,i:i+1,target:null}));
+   if(strict&&geometry){
+     // Resolve section for each table; do not assume all pages have identical margins.
+     for(const p of plans){p.sections=p.table.getRange('Whole').sections;p.sections.load('items');}
+     await c.sync();
+     for(const p of plans){
+       if(p.sections.items.length!==1)continue;
+       p.setup=p.sections.items[0].pageSetup;
+       p.setup.load('pageWidth,leftMargin,rightMargin,gutter,gutterPosition');
+       p.columns=p.setup.textColumns;p.columns.load('items');
+     }
+     await c.sync();
+     for(const p of plans)if(p.setup)p.target=pageFitWidth(p.setup,p.columns.items.length);
+   }
+   if(!await confirm('Áp dụng '+labels[mode]+' cho '+tables.length+' bảng? '+(strict?'Căn trái bảng; đặt chiều rộng theo lề trang khi xác định được. Không đổi lề trang hoặc liên kết Excel.':'Chỉ thay đổi bố cục bảng.')))return 'Đã huỷ.';
+   for(const p of plans){
+     if(strict)p.table.alignment='Left';
+     if(desktop)p.table.autoFitBehavior(mode);
+     else p.table.autoFitWindow();
    }
    await c.sync();
-   return 'Đã AutoFit '+tables.length+' bảng: '+labels[mode]+'.';
+   if(strict){
+     for(const p of plans)if(p.target!==null)p.table.width=p.target;
+     if(plans.some(p=>p.target!==null))await c.sync();
+   }
+   for(const p of plans)p.table.load('width,alignment');
+   await c.sync();
+   const verified=plans.filter(p=>p.target!==null&&Number.isFinite(p.table.width)&&Math.abs(p.table.width-p.target)<=1&&p.table.alignment==='Left').length;
+   const mismatches=plans.filter(p=>p.target!==null&&!(Number.isFinite(p.table.width)&&Math.abs(p.table.width-p.target)<=1&&p.table.alignment==='Left'));
+   const unknown=plans.filter(p=>p.target===null).length;
+   if(strict){
+     return 'Đã gửi AutoFit cho '+tables.length+' bảng Word; '+verified+' bảng đạt chiều rộng mục tiêu (theo API)'+(mismatches.length?'; '+mismatches.length+' bảng chưa đạt: '+mismatches.map(p=>p.i).join(', '):'')+(unknown?'; '+unknown+' bảng chỉ dùng AutoFit do chưa xác định được chiều rộng trang':'')+(skipped?'; bỏ qua '+skipped+' bảng lồng':'')+'. Không xử lý đối tượng Excel liên kết.';
+   }
+   return 'Đã AutoFit '+tables.length+' bảng Word: '+labels[mode]+(skipped?'; bỏ qua '+skipped+' bảng lồng':'')+'. Không xử lý đối tượng Excel liên kết.';
  }
- a['g-word-autofit']=()=>Word.run(c=>autoFitTables(c,val('g-fit-scope'),val('g-fit-mode'),(set,version)=>Office.context.requirements.isSetSupported(set,version),yes));
- return {actions:a,parseNumber,autoFitTables};
+ a['g-word-autofit']=()=>Word.run(c=>autoFitTables(c,val('g-fit-scope'),val('g-fit-mode'),(set,version)=>Office.context.requirements.isSetSupported(set,version),yes,$('#g-fit-normalize').checked));
+ return {actions:a,parseNumber,autoFitTables,pageFitWidth};
 })();

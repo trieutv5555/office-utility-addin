@@ -23,7 +23,7 @@ test();
 async function testAutoFit(){
   const G=new Function('TextUtils','document',fs.readFileSync(require('node:path').join(root,'general.js'),'utf8')+'\nreturn General;')(U,{});
   const calls=[];
-  const table=()=>({load(){},isNullObject:false,autoFitWindow(){calls.push('Window')},autoFitBehavior(m){calls.push(m)}});
+  const table=()=>({load(){},isNullObject:false,nestingLevel:1,autoFitWindow(){calls.push('Window')},autoFitBehavior(m){calls.push(m)}});
   const first=table(),second=table(),collection={items:[first,second],load(){}};
   const ctx={document:{body:{tables:collection},getSelection:()=>({parentTableOrNullObject:second})},sync:async()=>{}};
   const desktop=()=>true,baseOnly=(set)=>set==='WordApi',confirm=async()=>true;
@@ -35,6 +35,18 @@ async function testAutoFit(){
   calls.length=0;await G.autoFitTables(ctx,'all','Window',desktop,async()=>false);assert.equal(calls.length,0);
   await assert.rejects(()=>G.autoFitTables(ctx,'all','FixedSize',baseOnly,confirm));assert.equal(calls.length,0);
   collection.items=[];await G.autoFitTables(ctx,'all','Window',desktop,confirm);assert.equal(calls.length,0);
+  const setup={pageWidth:600,leftMargin:40,rightMargin:50,gutter:10,gutterPosition:'Left',load(){},textColumns:{items:[{}],load(){}}};
+  assert.equal(G.pageFitWidth(setup,1),500);
+  assert.equal(G.pageFitWidth(setup,2),null);
+  assert.equal(G.pageFitWidth({...setup,gutterPosition:'Top'},1),510);
+  const fitTable={...table(),width:300,alignment:'Centered',getRange(){return {sections:{items:[{pageSetup:setup}],load(){}}}}};
+  collection.items=[fitTable,{...table(),nestingLevel:2}];calls.length=0;
+  const result=await G.autoFitTables(ctx,'all','Window',desktop,confirm,true);
+  assert.equal(fitTable.width,500);assert.equal(fitTable.alignment,'Left');assert.deepEqual(calls,['Window']);
+  assert.ok(result.includes('1 bảng đạt')&&result.includes('bỏ qua 1 bảng lồng'));
+  fitTable.width=300;calls.length=0;
+  const fallback=await G.autoFitTables(ctx,'all','Window',baseOnly,confirm,true);
+  assert.equal(fitTable.width,300);assert.ok(fallback.includes('chưa xác định'));assert.deepEqual(calls,['Window']);
   console.log('AutoFit simulation passed (all modes, current table, compatibility, cancel, empty).');
 }
 testAutoFit().catch(e=>{console.error(e);process.exitCode=1;});
