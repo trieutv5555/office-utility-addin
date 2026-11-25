@@ -103,7 +103,7 @@
    */
   function findFormulaOutliers(cells, opts) {
     const o = Object.assign({ manual: true, minFormulas: 3, minShare: 0.5 }, opts);
-    const isFormula = (v,i) => typeof v === 'string' && v.startsWith('=') && (!o.values || v!==o.values[i]);
+    const isFormula = (v,i) => o.formulaMask ? !!o.formulaMask[i] : typeof v === 'string' && v.startsWith('=') && (!o.values || v!==o.values[i]);
     const counts = new Map();
     let first = -1;
     let last = -1;
@@ -158,7 +158,17 @@
     }
     return blocks;
   }
-  const api = { duplicateKey, safeSpreadsheetText, csvCell, scanBlocks, numberToWords, removeAccents, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers };
+  // Rectangle coordinates are absolute worksheet indexes, not A1 strings.
+  function formulaMask(rows,cols,rowIndex,columnIndex,areas){
+    const mask=Array.from({length:rows},()=>new Uint8Array(cols));
+    for(const a of areas){
+      const r0=Math.max(0,a.rowIndex-rowIndex),r1=Math.min(rows,a.rowIndex-rowIndex+a.rowCount);
+      const c0=Math.max(0,a.columnIndex-columnIndex),c1=Math.min(cols,a.columnIndex-columnIndex+a.columnCount);
+      for(let i=r0;i<r1;i++)if(c1>c0)mask[i].fill(1,c0,c1);
+    }
+    return mask;
+  }
+  const api = { formulaMask, duplicateKey, safeSpreadsheetText, csvCell, scanBlocks, numberToWords, removeAccents, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TextUtils = api;
 })(typeof window !== 'undefined' ? window : globalThis);

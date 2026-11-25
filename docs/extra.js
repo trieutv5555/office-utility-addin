@@ -67,8 +67,9 @@ const Extra = (() => {
             else seen.set(key,idx);
           });
         }else if(mode==='formula'){
+          const mask=await getFormulaMask(ctx,p);
           for(let j=0;j<b.w;j++){
-            const res=TextUtils.findFormulaOutliers(p.formulasR1C1.map(row=>row[j]),{manual:true,blank:true,values:p.values.map(row=>row[j])});
+            const res=TextUtils.findFormulaOutliers(p.formulasR1C1.map(row=>row[j]),{manual:true,blank:true,values:p.values.map(row=>row[j]),formulaMask:mask?mask.map(row=>row[j]):null});
             if(!res.total)continue;
             if(res.status==='mixed'||res.status==='few')add(0,b.c+j,'Chưa đủ cơ sở',res.status==='mixed'?'Không có mẫu chiếm đa số':'Dưới 3 công thức');
             if(res.status==='ok')res.outliers.forEach(o=>add(o.index,b.c+j,o.kind==='blank'?'Thiếu công thức':o.kind==='manual'?'Nhập tay':'Khác công thức',p.formulas[o.index][j]));

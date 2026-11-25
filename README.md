@@ -65,3 +65,10 @@ Bản này không chứa kiểm tra sản lượng, lương, đơn giá hay quy 
 - Dòng trùng giữ trạng thái so sánh giữa các khối; chuẩn hóa Unicode NFC, giữ kiểu dữ liệu, dấu câu và khoảng trắng bên trong. Không tự gộp những giá trị gần giống.
 - Tách hàm bảo vệ văn bản ghi vào Excel và CSV để nhất quán; thống kê kích thước và gộp sheet tải thông tin kích thước theo lô. Giới hạn ghi/sửa và gộp vẫn giữ nguyên.
 - Tham khảo phương pháp, không sao chép thư viện: https://github.com/OfficeDev/Office-Add-in-samples ; https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-ranges-large ; https://openrefine.org/docs/technical-reference/clustering-in-depth ; https://www.papaparse.com/docs . SheetJS SSF được tham khảo về hệ ngày Excel nhưng chưa thay đổi cách chuẩn hóa ngày.
+
+## Bản ổn định 4
+- ExcelApi 1.9+: nhận diện công thức bằng SpecialCells/RangeAreas; trên bản cũ kiểm tra chỉ dùng suy đoán chuỗi. Chuyển công thức thành giá trị cần ExcelApi 1.12 để kiểm tra vùng mảng/tràn. Trên bản hỗ trợ 1.12, các vùng sửa dữ liệu trực tiếp có mảng/tràn sẽ bị từ chối (kể cả vùng hỗn hợp). Không cam kết bảo vệ mọi thao tác cấu trúc sheet.
+- WordApiDesktop 1.4+: chữ hoa/thường dùng chức năng đổi kiểu chữ gốc của Word, tránh thay toàn đoạn. Các host cũ và thao tác khác vẫn dùng cơ chế thay đoạn có xác nhận, có thể mất định dạng.
+- Ngày tháng vẫn là ISO dạng văn bản; không dùng API Preview của hệ ngày 1900/1904. Khôi phục màu vẫn gần đúng, chưa bảo toàn theme/pattern.
+- Kiểm thử hồi quy: `node tests/regression.js` (không cần cài thư viện). Đây là test JS và mô phỏng, không thay thế kiểm thử Office thật.
+- Tài liệu: https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-multiple-ranges ; https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-ranges-dynamic-arrays ; https://learn.microsoft.com/en-us/javascript/api/word/word.range .

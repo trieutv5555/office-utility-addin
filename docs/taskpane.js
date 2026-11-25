@@ -32,6 +32,27 @@ async function loadBounded(ctx,range,props){
   if(range.isNullObject)return false;
   guard(range);range.load(props);await ctx.sync();return true;
 }
+function excelSupports(version){return Office.context.requirements.isSetSupported('ExcelApi',version);}
+async function getFormulaMask(ctx,range){
+  if(!excelSupports('1.9'))return null;
+  const matches=range.getSpecialCellsOrNullObject('Formulas');
+  matches.load('areaCount');
+  range.load('rowIndex,columnIndex,rowCount,columnCount');
+  await ctx.sync();
+  if(matches.isNullObject)return TextUtils.formulaMask(range.rowCount,range.columnCount,range.rowIndex,range.columnIndex,[]);
+  matches.areas.load('items/rowIndex,items/columnIndex,items/rowCount,items/columnCount');
+  await ctx.sync();
+  return TextUtils.formulaMask(range.rowCount,range.columnCount,range.rowIndex,range.columnIndex,matches.areas.items);
+}
+// Refuse writes if the selected/target range intersects a spill or saved array.
+async function protectArrays(ctx,range,required=false){
+  if(!excelSupports('1.12')){
+    if(required)throw Error('Công cụ này cần ExcelApi 1.12 để bảo vệ công thức mảng. Không thay đổi dữ liệu.');
+    return;
+  }
+  range.load('hasSpill,savedAsArray');await ctx.sync();
+  if(range.hasSpill!==false||range.savedAsArray!==false)throw Error('Vùng có hoặc giao với công thức mảng/tràn. Hãy chọn vùng khác; không thay đổi dữ liệu.');
+}
 async function assertUnchanged(ctx,range){
   const snapshot=JSON.stringify([range.values,range.formulas]);
   range.load('values,formulas');await ctx.sync();
@@ -62,16 +83,17 @@ function excelTransform(fn) {
   return Excel.run(async (ctx) => {
     const range = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
     if(!await loadBounded(ctx,range,['values','formulas','address','valueTypes']))return 'Vùng chọn đang trống.';
+    const mask=await getFormulaMask(ctx,range);
     let changed = 0;
     const edits = [];
     range.formulas.forEach((row,r) => row.forEach((v,c) => {
-      if (typeof v !== 'string' || v.startsWith('=') || range.valueTypes[r][c] !== 'String') return;
+      if (typeof v !== 'string' || (mask?mask[r][c]:v.startsWith('=')) || range.valueTypes[r][c] !== 'String') return;
       const n = fn(v);
       if (n !== v) edits.push([r,c,n]);
     }));
     if (edits.length > 5000) throw new Error('Chia nhỏ vùng chọn: tối đa 5.000 ô sửa mỗi lần.');
     if (edits.length && !await officeConfirm(`Sửa ${edits.length} ô văn bản? Hãy sao lưu trước khi thực hiện.`)) return 'Đã huỷ.';
-    if(edits.length){await assertUnchanged(ctx,range);writeEdits(range,edits);changed=edits.length;}
+    if(edits.length){await protectArrays(ctx,range);await assertUnchanged(ctx,range);writeEdits(range,edits);changed=edits.length;}
     await ctx.sync();
     return changed ? `Đã sửa ${changed} ô (${range.address}).` : 'Không có ô nào cần sửa.';
   });
@@ -91,7 +113,7 @@ function excelNumbersToWords(withCurrency) {
     if (rows.length > 5000) throw new Error('Tối đa 5.000 số mỗi lần.');
     if(rows.some(([v])=>!Number.isFinite(v)||Math.round(Math.abs(v))>999999999999999))throw Error('Có số vượt giới hạn 15 chữ số sau làm tròn.');
     if (rows.length && !await officeConfirm(`Ghi ${rows.length} kết quả vào cột bên phải? Số lẻ được làm tròn.`)) return 'Đã huỷ.';
-    if(rows.length){await assertUnchanged(ctx,range);await assertUnchanged(ctx,dest);writeEdits(dest,rows.map(([v,r])=>[r,0,numberToWords(v,withCurrency)]));}
+    if(rows.length){await protectArrays(ctx,dest);await assertUnchanged(ctx,range);await assertUnchanged(ctx,dest);writeEdits(dest,rows.map(([v,r])=>[r,0,numberToWords(v,withCurrency)]));}
     const count = rows.length;
     await ctx.sync();
     return count ? `Đã đọc ${count} số thành chữ.` : 'Không tìm thấy ô số nào trong vùng chọn.';
@@ -136,11 +158,12 @@ function excelCheckFormulas(highlight, manual) {
     const used = ctx.workbook.getSelectedRange().getUsedRangeOrNullObject(true);
     if(!await loadBounded(ctx,used,['values','formulas','formulasR1C1','rowIndex','columnIndex'])){renderFormulaReport([],sheet.name);Extra.show([]);return 'Vùng chọn đang trống.';}
 
+    const mask=await getFormulaMask(ctx,used);
     const reports = [];
     const flagged = [];
     for (let c = 0; c < used.columnCount; c++) {
       const letter = columnLetter(used.columnIndex + c);
-      const res = findFormulaOutliers(used.formulasR1C1.map((r) => r[c]), { manual, blank: true, values:used.values.map(r=>r[c]) });
+      const res = findFormulaOutliers(used.formulasR1C1.map((r) => r[c]), { manual, blank: true, values:used.values.map(r=>r[c]), formulaMask:mask?mask.map(r=>r[c]):null });
       if (res.total === 0) continue; // cột không có công thức thì bỏ qua
       const addrOf = (i) => letter + (used.rowIndex + i + 1);
       const rep = { letter, status: res.status, total: res.total };
@@ -260,7 +283,15 @@ function wordSelectionTransform(fn) {
     if (!sel.text) return 'Hãy bôi đen đoạn văn bản cần xử lý.';
     const next = fn(sel.text);
     if (next === sel.text) return 'Không có gì cần sửa.';
+    const original=sel.text;
+    const nativeCase=fn===TEXT_OPS.upper?'Upper':fn===TEXT_OPS.lower?'Lower':null;
+    if(nativeCase&&Office.context.requirements.isSetSupported('WordApiDesktop','1.4')){
+      if(!await officeConfirm('Chuyển kiểu chữ bằng chức năng gốc của Word?'))return 'Đã huỷ.';
+      sel.load('text');await ctx.sync();if(sel.text!==original)throw Error('Vùng chọn đã thay đổi. Hãy chạy lại.');
+      sel.case=nativeCase;await ctx.sync();return 'Đã chuyển kiểu chữ bằng Word, không thay toàn bộ đoạn.';
+    }
     if (!await officeConfirm('Thay văn bản đã chọn có thể làm mất định dạng từng phần. Tiếp tục?')) return 'Đã huỷ.';
+    sel.load('text');await ctx.sync();if(sel.text!==original)throw Error('Vùng chọn đã thay đổi. Hãy chạy lại.');
     sel.insertText(next, 'Replace');
     await ctx.sync();
     return 'Đã cập nhật đoạn văn bản đang chọn.';
