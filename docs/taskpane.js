@@ -20,7 +20,7 @@ function officeConfirm(message) {
   });
 }
 /* Tiện ích văn phòng – taskpane dùng chung cho Excel và Word (Office.js). */
-const { numberToWords, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers } = TextUtils;
+const { numberToWords, TEXT_OPS, columnLetter, findFormulaOutliers } = TextUtils;
 let HOST = null;
 let busy = false;
 const MAX_CELLS = 100000;
@@ -363,46 +363,6 @@ function wordReplace(pairs, matchCase) {
   });
 }
 
-function wordStats() {
-  return Word.run(async (ctx) => {
-    const body = ctx.document.body;
-    const sel = ctx.document.getSelection();
-    body.load('text');
-    sel.load('text');
-    await ctx.sync();
-    const all = textStats(body.text);
-    const s = textStats(sel.text);
-    const dl = $('#stats');
-    const rows = [
-      ['Số từ', all.words],
-      ['Số ký tự (cả khoảng trắng)', all.chars],
-      ['Số ký tự (không khoảng trắng)', all.charsNoSpaces],
-      ['Số đoạn', all.paragraphs],
-    ];
-    if (sel.text) rows.push(['Số từ trong vùng chọn', s.words]);
-    dl.replaceChildren();
-    rows.forEach(([k, v]) => {
-      const dt = document.createElement('dt');
-      const dd = document.createElement('dd');
-      dt.textContent = k;
-      dd.textContent = v.toLocaleString('vi-VN');
-      dl.append(dt, dd);
-    });
-    dl.hidden = false;
-    return 'Đã cập nhật thống kê.';
-  });
-}
-
-function wordInsertDate(long) {
-  return Word.run(async (ctx) => {
-    const selection=ctx.document.getSelection();selection.load('text');await ctx.sync();
-    if(selection.text&&!await officeConfirm('Thay vùng văn bản đã chọn bằng ngày hiện tại?'))return 'Đã huỷ.';
-    selection.insertText(formatDate(new Date(), long), 'Replace');
-    await ctx.sync();
-    return 'Đã chèn ngày.';
-  });
-}
-
 function parsePairs(text) {
   return text
     .split(/\r?\n/)
@@ -423,7 +383,6 @@ const ACTIONS = {
   noaccent: () => (HOST === 'Excel' ? excelTransform(TEXT_OPS.noaccent) : wordSelectionTransform(TEXT_OPS.noaccent)),
   'xl-words': () => excelNumbersToWords($('#xl-currency').checked),
   'xl-dup-mark': () => excelDuplicates('mark'),
-  'xl-dup-delete': () => excelDuplicates('delete'),
   'xl-fx-check': () => excelCheckFormulas($('#fx-highlight').checked, $('#fx-manual').checked),
   'xl-fx-clear': () => excelClearFlags(),
   'wd-clean': () => wordClean(),
@@ -432,9 +391,6 @@ const ACTIONS = {
     if (!pairs.length) return 'Nhập ít nhất một dòng dạng: cũ => mới';
     return wordReplace(pairs, $('#wd-case').checked);
   },
-  'wd-stats': () => wordStats(),
-  'wd-date-short': () => wordInsertDate(false),
-  'wd-date-long': () => wordInsertDate(true),
 };
 
 async function run(btn) {
