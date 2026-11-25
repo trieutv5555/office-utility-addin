@@ -59,3 +59,9 @@ Bản này không chứa kiểm tra sản lượng, lương, đơn giá hay quy 
 - Rà soát công thức bỏ qua cột không có công thức; kết quả kiểm tra cột cũng được đưa vào báo cáo chung. Ô trống khi quét vùng chọn bao gồm cả phần cuối vùng chọn.
 - Số âm làm tròn đối xứng; từ chối số quá lớn. Tô dòng trùng yêu cầu xác nhận; màu nền cũ không được phục hồi bởi công cụ này.
 - Giữ nguyên manifest và chức năng hiện có. Kiểm thử thực tế trong Office vẫn cần thực hiện trên bản sao dữ liệu.
+
+## Tối ưu theo các dự án mã nguồn mở
+- Rà soát nhiều sheet đọc theo khối (mục tiêu 20.000 ô/khối), giới hạn 1 triệu ô/sheet và 5 triệu ô/lượt; riêng công thức tối đa 100.000 dòng/cột, giữ nguyên toàn bộ cột khi so sánh mẫu R1C1. Các sheet vượt giới hạn được nêu tên. Báo cáo đếm đầy đủ nhưng chỉ lưu 10.000 kết quả, hiển thị 200.
+- Dòng trùng giữ trạng thái so sánh giữa các khối; chuẩn hóa Unicode NFC, giữ kiểu dữ liệu, dấu câu và khoảng trắng bên trong. Không tự gộp những giá trị gần giống.
+- Tách hàm bảo vệ văn bản ghi vào Excel và CSV để nhất quán; thống kê kích thước và gộp sheet tải thông tin kích thước theo lô. Giới hạn ghi/sửa và gộp vẫn giữ nguyên.
+- Tham khảo phương pháp, không sao chép thư viện: https://github.com/OfficeDev/Office-Add-in-samples ; https://learn.microsoft.com/en-us/office/dev/add-ins/excel/excel-add-ins-ranges-large ; https://openrefine.org/docs/technical-reference/clustering-in-depth ; https://www.papaparse.com/docs . SheetJS SSF được tham khảo về hệ ngày Excel nhưng chưa thay đổi cách chuẩn hóa ngày.

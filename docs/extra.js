@@ -5,10 +5,10 @@ const Extra = (() => {
   const cap = 100000;
   const limit = 10000;
   let report = [];
-  function show(items) {
+  function show(items,total=items.length) {
     report = items;
     const box = $('#extra-results'); box.replaceChildren();
-    const p = document.createElement('p'); p.textContent = `${items.length} kết quả (hiện tối đa 200; xuất CSV để xem đầy đủ).`; box.append(p);
+    const p = document.createElement('p'); p.textContent = `${total} kết quả; lưu ${items.length}, hiện tối đa 200. CSV chỉ xuất các kết quả đã lưu.`; box.append(p);
     for (const it of items.slice(0,200)) {
       const b = document.createElement('button'); b.className='fx-item';
       b.textContent = `${it.sheet ? it.sheet+'!'+it.addr+' — ' : ''}${it.kind}: ${it.text}`;
@@ -17,34 +17,75 @@ const Extra = (() => {
       box.append(b);
     }
   }
-  function csvCell(v) { let t=String(v??''); if (/^[\s]*[=+\-@]/.test(t)||/^[\t\r\n]/.test(t)) t="'"+t; return '"'+t.replace(/"/g,'""')+'"'; }
+  const csvCell=TextUtils.csvCell;
   actions['export-csv'] = async () => {
     if (!report.length) return 'Chưa có kết quả.';
     const text='\uFEFF'+[['Sheet','Ô','Loại','Nội dung'],...report.map(x=>[x.sheet,x.addr,x.kind,x.text])].map(r=>r.map(csvCell).join(',')).join('\r\n');
     const url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=url; a.download='Bao-cao-tien-ich.csv'; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return 'Đã yêu cầu tải báo cáo CSV.';
   };
+  // Read bounded blocks; do not silently drop a sheet just because it exceeds 100k cells.
   function audit(mode) { return Excel.run(async ctx=>{
     const all=$('#audit-all').checked;
-    const term=$('#audit-query').value.trim().toLocaleLowerCase('vi-VN');
+    const term=$('#audit-query').value.trim().normalize('NFC').toLocaleLowerCase('vi-VN');
     if(mode==='search'&&!term) throw Error('Nhập từ khoá.');
     const sheets=ctx.workbook.worksheets; sheets.load('items/name,items/visibility');
     const active=ctx.workbook.worksheets.getActiveWorksheet(); active.load('name'); await ctx.sync();
-    const items=[]; let skipped=0, scanned=0, truncated=false;
-    for(const ws of sheets.items){
-      if(ws.visibility!=='Visible'||(!all&&ws.name!==active.name)) continue;
-      const r=all?ws.getUsedRangeOrNullObject(true):ctx.workbook.getSelectedRange();
-      r.load(['rowCount','columnCount','rowIndex','columnIndex']); await ctx.sync();
-      if(r.isNullObject) continue;
-      if(r.rowCount*r.columnCount>cap){skipped++; continue;}
-      const props=['values'];if(['search','blank','formula'].includes(mode))props.push('formulas');if(mode==='formula')props.push('formulasR1C1');if(mode==='errors')props.push('valueTypes');r.load(props);await ctx.sync();scanned++;
-      const add=(i,j,kind,text)=>{if(items.length>=limit){truncated=true;return;} items.push({sheet:ws.name,addr:TextUtils.columnLetter(r.columnIndex+j)+(r.rowIndex+i+1),kind,text:String(text??'')});};
-      if(mode==='duplicate'){
-        const seen=new Map(); r.values.forEach((row,i)=>{if(row.every(v=>v===''))return;const key=JSON.stringify(row.map(v=>typeof v==='string'?v.trim().toLowerCase():v)); if(seen.has(key))add(i,0,'Dòng trùng',`Trùng dòng ${r.rowIndex+seen.get(key)+1}`);else seen.set(key,i);});
-      } else if(mode==='formula'){
-        for(let j=0;j<r.columnCount;j++){const res=TextUtils.findFormulaOutliers(r.formulasR1C1.map(row=>row[j]),{manual:true,blank:true,values:r.values.map(row=>row[j])}); if(!res.total)continue; if(res.status==='mixed'||res.status==='few')add(0,j,'Chưa đủ cơ sở',res.status==='mixed'?'Không có mẫu chiếm đa số':'Dưới 3 công thức'); if(res.status==='ok')res.outliers.forEach(o=>add(o.index,j,o.kind==='blank'?'Thiếu công thức':o.kind==='manual'?'Nhập tay':'Khác công thức',r.formulas[o.index][j]));}
-      }else r.values.forEach((row,i)=>row.forEach((v,j)=>{if(mode==='search'&&(String(v).toLocaleLowerCase('vi-VN').includes(term)||String(r.formulas[i][j]).toLocaleLowerCase('vi-VN').includes(term)))add(i,j,'Tìm thấy',v); if(mode==='errors'&&r.valueTypes[i][j]==='Error')add(i,j,'Lỗi Excel',v); if(mode==='blank'&&v===''&&r.formulas[i][j]==='')add(i,j,'Ô trống','');}));
+    const targets=sheets.items.filter(ws=>ws.visibility==='Visible'&&(all||ws.name===active.name)).map(ws=>{
+      const range=all?ws.getUsedRangeOrNullObject(true):ctx.workbook.getSelectedRange();
+      range.load('rowCount,columnCount,rowIndex,columnIndex');return {ws,range};
+    });
+    await ctx.sync();
+    const items=[];let scanned=0,matched=0,cells=0;const skipped=[];
+    const sheetCap=1000000, workbookCap=5000000;
+    const props=['values'];
+    if(['search','blank','formula'].includes(mode))props.push('formulas');
+    if(mode==='formula')props.push('formulasR1C1');
+    if(mode==='errors')props.push('valueTypes');
+    for(const {ws,range} of targets){
+      if(range.isNullObject)continue;
+      const count=range.rowCount*range.columnCount;
+      // R1C1 scans need complete columns, otherwise the majority pattern changes at block boundaries.
+      if(count>sheetCap||cells+count>workbookCap||(mode==='formula'&&range.rowCount>100000)){
+        skipped.push(ws.name);continue;
+      }
+      const seen=mode==='duplicate'?new Map():null;
+      const columns=Array.from({length:range.columnCount},(_,j)=>TextUtils.columnLetter(range.columnIndex+j));
+      const blocks=TextUtils.scanBlocks(range.rowCount,range.columnCount,mode);
+      const add=(i,j,kind,text)=>{
+        matched++;if(items.length>=limit)return;
+        items.push({sheet:ws.name,addr:columns[j]+(range.rowIndex+i+1),kind,text:String(text??'')});
+      };
+      setStatus('Đang rà soát '+ws.name+' ('+(scanned+1)+'/'+targets.length+')…');
+      for(const b of blocks){
+        const p=ws.getRangeByIndexes(range.rowIndex+b.r,range.columnIndex+b.c,b.h,b.w);
+        p.load(props);await ctx.sync();
+        if(mode==='duplicate'){
+          p.values.forEach((row,i)=>{
+            if(row.every(v=>v===''))return;
+            const key=TextUtils.duplicateKey(row),idx=b.r+i;
+            if(seen.has(key))add(idx,0,'Dòng trùng','Trùng dòng '+(range.rowIndex+seen.get(key)+1));
+            else seen.set(key,idx);
+          });
+        }else if(mode==='formula'){
+          for(let j=0;j<b.w;j++){
+            const res=TextUtils.findFormulaOutliers(p.formulasR1C1.map(row=>row[j]),{manual:true,blank:true,values:p.values.map(row=>row[j])});
+            if(!res.total)continue;
+            if(res.status==='mixed'||res.status==='few')add(0,b.c+j,'Chưa đủ cơ sở',res.status==='mixed'?'Không có mẫu chiếm đa số':'Dưới 3 công thức');
+            if(res.status==='ok')res.outliers.forEach(o=>add(o.index,b.c+j,o.kind==='blank'?'Thiếu công thức':o.kind==='manual'?'Nhập tay':'Khác công thức',p.formulas[o.index][j]));
+          }
+        }else{
+          p.values.forEach((row,i)=>row.forEach((v,j)=>{
+            const ri=b.r+i,cj=b.c+j;
+            if(mode==='search'&&(String(v).normalize('NFC').toLocaleLowerCase('vi-VN').includes(term)||String(p.formulas[i][j]).normalize('NFC').toLocaleLowerCase('vi-VN').includes(term)))add(ri,cj,'Tìm thấy',v);
+            if(mode==='errors'&&p.valueTypes[i][j]==='Error')add(ri,cj,'Lỗi Excel',v);
+            if(mode==='blank'&&v===''&&p.formulas[i][j]==='')add(ri,cj,'Ô trống','');
+          }));
+        }
+      }
+      scanned++;cells+=count;
     }
-    show(items); return `Đã quét ${scanned} sheet; bỏ qua ${skipped} vùng quá lớn; ${items.length} kết quả${truncated?' (đã chạm giới hạn 10.000)':''}.`;
+    show(items,matched);
+    return 'Đã quét '+scanned+' sheet, '+cells.toLocaleString('vi-VN')+' ô; '+matched+' kết quả'+(matched>limit?' (chỉ lưu 10.000)':'')+(skipped.length?'; bỏ qua do giới hạn: '+skipped.join(', '):'')+'.';
   }); }
   for(const m of ['search','errors','blank','duplicate','formula']) actions['audit-'+m]=()=>audit(m);
   actions['xl-summary']=()=>Excel.run(async ctx=>{const r=ctx.workbook.getSelectedRange();r.load('rowCount,columnCount');await ctx.sync();if(r.rowCount*r.columnCount>cap)throw Error('Vùng quá lớn.');r.load('values');await ctx.sync();let sum=0,n=0,min=Infinity,max=-Infinity,blank=0;for(const row of r.values)for(const v of row){if(v==='')blank++;if(typeof v==='number'){n++;sum+=v;min=Math.min(min,v);max=Math.max(max,v);}}show([['Số ô số',n],['Tổng',sum],['Trung bình',n?sum/n:'—'],['Nhỏ nhất',n?min:'—'],['Lớn nhất',n?max:'—'],['Ô trống',blank]].map(([kind,text])=>({kind,text})));return 'Đã thống kê vùng chọn.';});

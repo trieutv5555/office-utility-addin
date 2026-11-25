@@ -44,7 +44,7 @@ function writeEdits(range,edits,textFormat=false){
     while(end<sorted.length&&sorted[end][1]===col&&sorted[end][0]===sorted[end-1][0]+1)end++;
     const target=range.getCell(row,col).getResizedRange(end-i-1,0);
     if(textFormat)target.numberFormat=Array.from({length:end-i},()=>['@']);
-    target.values=sorted.slice(i,end).map(x=>[typeof x[2]==='string'&&/^[=+\-@]/.test(x[2])?"'"+x[2]:x[2]]);
+    target.values=sorted.slice(i,end).map(x=>[TextUtils.safeSpreadsheetText(x[2])]);
     i=end;
   }
 }
@@ -106,7 +106,7 @@ function excelDuplicates(mode) {
     const dups = [];
     range.values.forEach((row, i) => {
       if (row.every(v => v === '')) return;
-      const key = JSON.stringify(row.map((v) => (typeof v === 'string' ? v.trim().toLowerCase() : v)));
+      const key = TextUtils.duplicateKey(row);
       if (seen.has(key)) dups.push(i);
       else seen.add(key);
     });
@@ -177,7 +177,7 @@ function excelCheckFormulas(highlight, manual) {
     await ctx.sync();
     renderFormulaReport(reports, sheet.name);
     const combined=reports.flatMap(rep=>(rep.items||[]).map(it=>({sheet:sheet.name,addr:it.addr,kind:it.kind==='blank'?'Thiếu công thức':it.kind==='manual'?'Nhập tay':'Khác công thức',text:it.text})));
-    Extra.show(combined.slice(0,10000));
+    Extra.show(combined.slice(0,10000),combined.length);
     return flagged.length
       ? `Đã kiểm tra ${reports.length} cột có công thức, phát hiện ${flagged.length} ô bất thường.`
       : `Đã kiểm tra ${reports.length} cột có công thức, không thấy ô bất thường.`;

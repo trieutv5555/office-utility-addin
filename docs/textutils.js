@@ -134,7 +134,31 @@
     return { status: 'ok', total, domCount, sample: cells.findIndex((v,i)=>v===dom&&isFormula(v,i)), outliers };
   }
 
-  const api = { numberToWords, removeAccents, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers };
+  // Conservative comparison: preserve punctuation, internal spaces and numeric types.
+  function duplicateKey(row) {
+    return JSON.stringify(row.map(v=>typeof v==='string'?v.normalize('NFC').trim().toLocaleLowerCase(LOCALE):v));
+  }
+  function safeSpreadsheetText(v) {
+    return typeof v==='string' && (/^[\s\uFEFF]*[=+\-@]/.test(v)||/^[\t\r\n]/.test(v)) ? "'"+v : v;
+  }
+  function csvCell(v) {
+    const text=safeSpreadsheetText(String(v??''));
+    return '"'+text.replace(/"/g,'""')+'"';
+  }
+  // Whole rows for duplicate checks; whole columns for R1C1 comparison.
+  function scanBlocks(rows,cols,mode,target=20000) {
+    if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<1||cols<1)throw Error('Invalid range dimensions');
+    const blocks=[];
+    if(mode==='formula'){
+      const width=Math.max(1,Math.floor(target/rows));
+      for(let j=0;j<cols;j+=width)blocks.push({r:0,c:j,h:rows,w:Math.min(width,cols-j)});
+    }else{
+      const height=Math.max(1,Math.floor(target/cols));
+      for(let i=0;i<rows;i+=height)blocks.push({r:i,c:0,h:Math.min(height,rows-i),w:cols});
+    }
+    return blocks;
+  }
+  const api = { duplicateKey, safeSpreadsheetText, csvCell, scanBlocks, numberToWords, removeAccents, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TextUtils = api;
 })(typeof window !== 'undefined' ? window : globalThis);
