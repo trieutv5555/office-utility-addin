@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tiện ích văn phòng</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="taskpane.css">
+</head>
+<body>
+  <header>
+    <h1>Tiện ích văn phòng</h1>
+    <p id="host-label">Đang kết nối với Office…</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Chuẩn hoá văn bản</h2>
+      <p class="hint">Áp dụng cho vùng hoặc đoạn văn bản đang chọn.</p>
+      <div class="grid">
+        <button data-action="trim">Xoá khoảng trắng thừa</button>
+        <button data-action="noaccent">Bỏ dấu tiếng Việt</button>
+        <button data-action="upper">CHỮ HOA</button>
+        <button data-action="lower">chữ thường</button>
+        <button data-action="proper" class="wide">Viết Hoa Đầu Mỗi Từ</button>
+      </div>
+    </section>
+
+    <section data-host="Excel">
+      <h2>Số thành chữ</h2>
+      <p class="hint">Chọn một cột số. Kết quả ghi vào cột ngay bên phải, chỉ ở những dòng có số.</p>
+      <label class="check"><input type="checkbox" id="xl-currency" checked> Thêm “đồng” ở cuối</label>
+      <button class="primary" data-action="xl-words">Đọc số thành chữ</button>
+    </section>
+
+    <section data-host="Excel">
+      <h2>Dòng trùng</h2>
+      <p class="hint">So sánh cả dòng trong vùng chọn, không phân biệt hoa/thường. Giữ dòng xuất hiện đầu tiên.</p>
+      <div class="grid">
+        <button data-action="xl-dup-mark">Tô vàng dòng trùng</button>
+        <button data-action="xl-dup-delete" class="danger">Xoá dòng trùng</button>
+      </div>
+    </section>
+
+    <section data-host="Excel">
+      <h2>Kiểm tra công thức trong cột</h2>
+      <p class="hint">Chọn một hoặc nhiều cột. Công thức được so sánh theo vị trí tương đối nên công thức kéo xuống vẫn tính là giống nhau. Ô khác với công thức chiếm đa số của cột sẽ được liệt kê; bấm vào dòng để đến ô đó.</p>
+      <label class="check"><input type="checkbox" id="fx-manual" checked> Báo cả ô nhập tay (số/chữ) nằm giữa các công thức</label>
+      <label class="check"><input type="checkbox" id="fx-highlight"> Tô đỏ nhạt các ô bất thường</label>
+      <div class="grid">
+        <button class="primary" data-action="xl-fx-check">Kiểm tra công thức</button>
+        <button data-action="xl-fx-clear">Bỏ tô màu</button>
+      </div>
+      <p class="hint small">“Bỏ tô màu” xoá màu nền của các ô đã tô ở lần kiểm tra gần nhất, kể cả màu nền cũ của chúng.</p>
+      <div id="fx-results"></div>
+    </section>
+
+    <section data-host="Word">
+      <h2>Dọn dẹp tài liệu</h2>
+      <p class="hint">Gộp khoảng trắng liên tiếp và bỏ các đoạn trống thừa trong toàn bộ tài liệu.</p>
+      <button class="primary" data-action="wd-clean">Dọn dẹp toàn bộ tài liệu</button>
+    </section>
+
+    <section data-host="Word">
+      <h2>Thay thế hàng loạt</h2>
+      <p class="hint">Mỗi dòng một cặp, dạng: <code>cũ =&gt; mới</code></p>
+      <textarea id="wd-pairs" rows="5" spellcheck="false" placeholder="Cty => Công ty&#10;TP.HCM => Thành phố Hồ Chí Minh"></textarea>
+      <label class="check"><input type="checkbox" id="wd-case"> Phân biệt hoa/thường</label>
+      <button class="primary" data-action="wd-replace">Thay thế</button>
+    </section>
+
+    <section data-host="Word">
+      <h2>Thống kê và chèn ngày</h2>
+      <button data-action="wd-stats">Thống kê tài liệu</button>
+      <dl id="stats" hidden></dl>
+      <div class="grid">
+        <button data-action="wd-date-short">Chèn 25/11/2026</button>
+        <button data-action="wd-date-long">Chèn “Ngày … tháng … năm …”</button>
+      </div>
+    </section>
+  </main>
+
+  <p id="status" role="status" aria-live="polite"></p>
+
+  <script src="textutils.js"></script>
+  <script src="taskpane.js"></script>
+</body>
+</html>
