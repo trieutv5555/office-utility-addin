@@ -1,3 +1,24 @@
+
+/* In-pane confirmation: native browser dialogs are unavailable in Office. */
+function officeConfirm(message) {
+  return new Promise(resolve => {
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:12px;';
+    const panel=document.createElement('div');
+    panel.style.cssText='background:#fff;color:#222;padding:16px;border-radius:8px;width:100%;max-width:340px;box-shadow:0 4px 24px #0004;';
+    panel.setAttribute('role','alertdialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','Xác nhận thao tác');
+    const title=document.createElement('strong');title.textContent='Xác nhận thao tác';
+    const p=document.createElement('p');p.textContent=message;
+    const buttons=document.createElement('div');buttons.style.cssText='display:flex;gap:8px;justify-content:flex-end;';
+    const cancel=document.createElement('button'),ok=document.createElement('button');
+    cancel.type=ok.type='button';cancel.textContent='Huỷ';ok.textContent='Tiếp tục';ok.style.cssText='background:#107c41;color:white;';
+    const previous=document.activeElement;
+    function finish(value){document.removeEventListener('keydown',key,true);overlay.remove();if(previous&&previous.focus&&!previous.disabled)previous.focus();resolve(value);}
+    function key(e){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(false);}else if(e.key==='Tab'){e.preventDefault();(document.activeElement===cancel?ok:cancel).focus();}}
+    cancel.addEventListener('click',()=>finish(false));ok.addEventListener('click',()=>finish(true));
+    buttons.append(cancel,ok);panel.append(title,p,buttons);overlay.append(panel);document.body.append(overlay);document.addEventListener('keydown',key,true);cancel.focus();
+  });
+}
 /* Tiện ích văn phòng – taskpane dùng chung cho Excel và Word (Office.js). */
 const { numberToWords, TEXT_OPS, formatDate, textStats, columnLetter, findFormulaOutliers } = TextUtils;
 let HOST = null;
@@ -31,7 +52,7 @@ function excelTransform(fn) {
       if (n !== v) edits.push([r,c,n]);
     }));
     if (edits.length > 5000) throw new Error('Chia nhỏ vùng chọn: tối đa 5.000 ô sửa mỗi lần.');
-    if (edits.length && !confirm(`Sửa ${edits.length} ô văn bản? Hãy sao lưu trước khi thực hiện.`)) return 'Đã huỷ.';
+    if (edits.length && !await officeConfirm(`Sửa ${edits.length} ô văn bản? Hãy sao lưu trước khi thực hiện.`)) return 'Đã huỷ.';
     edits.forEach(([r,c,n]) => { range.getCell(r,c).values = [[/^[=+\-@]/.test(n) ? "'"+n : n]]; changed++; });
     await ctx.sync();
     return changed ? `Đã sửa ${changed} ô (${range.address}).` : 'Không có ô nào cần sửa.';
@@ -51,7 +72,7 @@ function excelNumbersToWords(withCurrency) {
     const rows = range.values.map((row,r) => [row[0],r]).filter(([v]) => typeof v === 'number');
     if (rows.some(([,r]) => dest.values[r][0] !== '' || dest.formulas[r][0] !== '')) throw new Error('Cột kết quả có dữ liệu hoặc công thức. Hãy để trống các ô đích.');
     if (rows.length > 5000) throw new Error('Tối đa 5.000 số mỗi lần.');
-    if (rows.length && !confirm(`Ghi ${rows.length} kết quả vào cột bên phải? Số lẻ được làm tròn.`)) return 'Đã huỷ.';
+    if (rows.length && !await officeConfirm(`Ghi ${rows.length} kết quả vào cột bên phải? Số lẻ được làm tròn.`)) return 'Đã huỷ.';
     rows.forEach(([v,r]) => dest.getCell(r,0).values = [[numberToWords(v,withCurrency)]]);
     const count = rows.length;
     await ctx.sync();
@@ -217,7 +238,7 @@ function wordSelectionTransform(fn) {
     if (!sel.text) return 'Hãy bôi đen đoạn văn bản cần xử lý.';
     const next = fn(sel.text);
     if (next === sel.text) return 'Không có gì cần sửa.';
-    if (!confirm('Thay văn bản đã chọn có thể làm mất định dạng từng phần. Tiếp tục?')) return 'Đã huỷ.';
+    if (!await officeConfirm('Thay văn bản đã chọn có thể làm mất định dạng từng phần. Tiếp tục?')) return 'Đã huỷ.';
     sel.insertText(next, 'Replace');
     await ctx.sync();
     return 'Đã cập nhật đoạn văn bản đang chọn.';
@@ -226,7 +247,7 @@ function wordSelectionTransform(fn) {
 
 function wordClean() {
   return Word.run(async (ctx) => {
-    if (!confirm('Dọn khoảng trắng và đoạn trống toàn tài liệu? Có thể ảnh hưởng bố cục.')) return 'Đã huỷ.';
+    if (!await officeConfirm('Dọn khoảng trắng và đoạn trống toàn tài liệu? Có thể ảnh hưởng bố cục.')) return 'Đã huỷ.';
     const body = ctx.document.body;
     const spaces = body.search('[ ]{2,}', { matchWildcards: true });
     spaces.load('items');
@@ -253,7 +274,7 @@ function wordClean() {
 
 function wordReplace(pairs, matchCase) {
   return Word.run(async (ctx) => {
-    if (!confirm('Thay thế lần lượt từng cặp trên toàn bộ nội dung chính? Kết quả cặp trước có thể khớp cặp sau.')) return 'Đã huỷ.';
+    if (!await officeConfirm('Thay thế lần lượt từng cặp trên toàn bộ nội dung chính? Kết quả cặp trước có thể khớp cặp sau.')) return 'Đã huỷ.';
     let total = 0;
     for (const [find,replacement] of pairs) {
       const res = ctx.document.body.search(find,{matchCase}); res.load('items'); await ctx.sync();
