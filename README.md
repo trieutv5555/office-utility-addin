@@ -13,6 +13,8 @@ Cấu hình từ 1 đến 50 nhà máy trong khung tiện ích: tên, tọa đ�
 
 Các điều kiện GPS có hướng dẫn và ví dụ ngay dưới ô nhập. Khôi phục mặc định chỉ đặt lại 5 km, 30 phút, 10 phút; không đổi danh sách nhà máy. Xóa cài đặt cần xác nhận và xóa cả tọa độ đã lưu.
 
+Sau khi lưu thành công, phần cài đặt GPS tự thu gọn; mở lại bằng Chỉnh sửa cài đặt GPS. Khi mở lại tiện ích, cấu hình đã lưu được nạp và phần chỉnh sửa mặc định thu gọn. Nút chạy luôn nằm ngoài phần chỉnh sửa.
+
 ## Sử dụng
 
 Add-in dùng Office.js, chạy trên các phiên bản Office tương thích (không hỗ trợ Office 2010). Triển khai qua GitHub Pages, không cần VBA hay máy chủ cục bộ.

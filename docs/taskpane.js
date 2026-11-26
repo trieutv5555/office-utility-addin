@@ -375,6 +375,7 @@ function parsePairs(text) {
 
 const ACTIONS = {
   'xl-gps': () => GPS.run(),
+  'xl-gps-toggle': () => GPS.toggleSettings(),
   'xl-gps-add': () => GPS.add(),
   'xl-gps-reset': () => GPS.resetDefaults(),
   'xl-gps-save': () => GPS.save(),

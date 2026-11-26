@@ -135,3 +135,11 @@ section details > button { width:100%; margin:3px 0; }
 #gps-section .gps-actions .gps-save,#gps-section .gps-actions .gps-run{grid-column:1/-1;}
 #gps-section .gps-actions .gps-run{background:#185abd;border-color:#185abd;font-weight:600;}
 @media(max-width:245px){#gps-section .gps-factory>.grid,#gps-section .gps-actions{grid-template-columns:1fr;}}
+
+/* Keep the GPS editor out of the way after saving. The run button stays outside it. */
+#gps-section #gps-settings-panel[hidden],#gps-section #gps-config-summary[hidden]{display:none!important;}
+#gps-section .gps-summary{padding:9px 10px;border:1px solid #d6e5db;border-radius:6px;background:#f4faf6;margin:4px 0 7px;overflow-wrap:anywhere;}
+#gps-section .gps-summary strong{display:block;color:#215c3c;font-size:13px;}
+#gps-section .gps-summary p{margin:4px 0 0;color:var(--muted);font-size:12.5px;}
+#gps-section #gps-settings-toggle{width:100%;margin:4px 0;color:#185abd;border-color:#a5b9d5;}
+#gps-section > details > .gps-run{background:#185abd;border-color:#185abd;font-weight:600;margin-top:8px;}

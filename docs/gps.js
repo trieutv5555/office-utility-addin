@@ -499,6 +499,28 @@ function displayConfig(c){
  document.getElementById('gps-factory-minutes').value=String(c?c.factoryMinutes:30);
  document.getElementById('gps-rest-minutes').value=String(c?c.restMinutes:10);
 }
+let savedSnapshot=null;
+function showSettings(open,c=null){
+ const panel=document.getElementById('gps-settings-panel');
+ const summary=document.getElementById('gps-config-summary');
+ const toggle=document.getElementById('gps-settings-toggle');
+ panel.hidden=!open;
+ summary.hidden=open;
+ toggle.textContent=open?'Thu gọn cài đặt':'Chỉnh sửa cài đặt GPS';
+ toggle.setAttribute('aria-expanded',String(open));
+ if(!open&&c){
+  const saved=JSON.stringify(c)===savedSnapshot;
+  document.getElementById('gps-summary-state').textContent=saved?'Đã lưu cài đặt':'Cài đặt chưa lưu – dùng cho phiên này';
+  document.getElementById('gps-summary-sites').textContent=c.factories.length+' nhà máy đã cấu hình';
+  document.getElementById('gps-summary-rules').textContent='Chuyến ≥ '+c.minKm+' km · Về nhà máy ≥ '+c.factoryMinutes+' phút · Dừng giữa chuyến > '+c.restMinutes+' phút';
+ }
+}
+function toggleSettings(){
+ const panel=document.getElementById('gps-settings-panel');
+ if(panel.hidden){showSettings(true);return 'Đã mở cài đặt GPS.';}
+ const c=readConfig();showSettings(false,c);
+ return JSON.stringify(c)===savedSnapshot?'Đã thu gọn cài đặt GPS.':'Đã thu gọn. Thay đổi chưa lưu, chỉ áp dụng trong phiên hiện tại.';
+}
 function init(){
  let c=null;
  try{
@@ -507,11 +529,14 @@ function init(){
   else{const old=localStorage.getItem(LEGACY_KEY);if(old){c=migrateLegacy(JSON.parse(old));try{localStorage.setItem(KEY,JSON.stringify(c));localStorage.removeItem(LEGACY_KEY);}catch(_){/* retain old settings if migration cannot persist */}}}
  }catch(_){c=null;}
  displayConfig(c);
+ savedSnapshot=c?JSON.stringify(c):null;
+ showSettings(!c,c);
 }
 function save(){
  const c=readConfig();
  try{localStorage.setItem(KEY,JSON.stringify(c));localStorage.removeItem(LEGACY_KEY);}catch(_){throw Error('Không lưu được hoàn toàn cấu hình cục bộ. Bạn vẫn có thể chạy trong phiên hiện tại.');}
- return 'Đã lưu '+c.factories.length+' nhà máy trên thiết bị này.';
+ savedSnapshot=JSON.stringify(c);showSettings(false,c);
+ return 'Đã lưu '+c.factories.length+' nhà máy và thu gọn cài đặt GPS.';
 }
 function resetDefaults(){
  document.getElementById('gps-min-km').value='5';
@@ -522,7 +547,7 @@ function resetDefaults(){
 async function clear(){
  if(!await officeConfirm('Xóa toàn bộ cấu hình GPS đã lưu trên thiết bị này, gồm cả tên và tọa độ nhà máy?'))return 'Đã huỷ.';
  try{localStorage.removeItem(KEY);localStorage.removeItem(LEGACY_KEY);}catch(_){throw Error('Không xóa được cấu hình trong bộ nhớ cục bộ.');}
- displayConfig(null);return 'Đã xóa cấu hình GPS trên thiết bị này.';
+ savedSnapshot=null;displayConfig(null);showSettings(true);return 'Đã xóa cấu hình GPS trên thiết bị này.';
 }
 async function run(){
  const config=readConfig();
@@ -563,5 +588,5 @@ async function run(){
  out.activate();await ctx.sync();return 'GPS: Đã ghi '+trips.length+' chuyến ≥'+config.minKm+' km và '+rests.length+' lần dừng vào Chuyến đi 1.';
  });
 }
-return {run,calculate,init,save,clear,add,resetDefaults,validateConfig,migrateLegacy};
+return {run,calculate,init,save,clear,add,resetDefaults,toggleSettings,validateConfig,migrateLegacy};
 })();
