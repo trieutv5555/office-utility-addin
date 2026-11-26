@@ -9,7 +9,7 @@ Tiện ích tiếng Việt dành cho Microsoft Excel và Word, giúp xử lý d�
 
 ## GPS (Excel)
 
-Nhập tọa độ NM1/NM2, bán kính và quãng đường tối thiểu trong khung tiện ích. Tọa độ không có giá trị mặc định; chỉ lưu trong bộ nhớ cục bộ của thiết bị khi chọn Lưu cài đặt GPS. Có thể xóa cài đặt hoặc chạy mà không lưu. Dữ liệu hành trình được đọc từ workbook, không gửi đến máy chủ của add-in.
+Cấu hình từ 1 đến 50 nhà máy trong khung tiện ích: tên, tọa độ và bán kính riêng. Điều chỉnh ngưỡng chuyến (mặc định 5 km), thời gian dừng tại nhà máy (mặc định ≥30 phút) và dừng nghỉ (mặc định >10 phút). Cấu hình đã lưu từ 1.0.7 được tự chuyển sang định dạng mới. Tọa độ không có giá trị mặc định; chỉ lưu trong bộ nhớ cục bộ của thiết bị khi chọn Lưu cài đặt GPS. Có thể xóa cài đặt hoặc chạy mà không lưu. Dữ liệu hành trình được đọc từ workbook, không gửi đến máy chủ của add-in.
 
 ## Sử dụng
 

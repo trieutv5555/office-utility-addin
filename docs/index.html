@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tiện ích văn phòng</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link rel="stylesheet" href="taskpane.css?v=1.0.7">
+  <link rel="stylesheet" href="taskpane.css?v=1.0.8">
 </head>
 <body>
   <header>
     <h1>Tiện ích văn phòng</h1>
-    <p id="app-version">Phiên bản 1.0.7</p>
+    <p id="app-version">Phiên bản 1.0.8</p>
     <p id="host-label">Đang kết nối với Office…</p>
   </header>
 
   <label for="tool-search">Tìm công cụ</label><input id="tool-search" type="search" placeholder="Ví dụ: công thức, trùng, số">
   <main>
-<section data-host="Excel"><h2>Kiểm tra hành trình GPS</h2><p class="hint">Đọc sheet Data từ dòng 5. Dừng tại nhà máy ≥30 phút; dừng nghỉ &gt;10 phút. Nhập tọa độ riêng của bạn; không có tọa độ mặc định.</p><div class="grid"><div><label for="gps-nm1-lon">Kinh độ NM1</label><input id="gps-nm1-lon" inputmode="decimal" autocomplete="off" spellcheck="false" value=""></div><div><label for="gps-nm1-lat">Vĩ độ NM1</label><input id="gps-nm1-lat" inputmode="decimal" autocomplete="off" spellcheck="false" value=""></div><div><label for="gps-nm2-lon">Kinh độ NM2</label><input id="gps-nm2-lon" inputmode="decimal" autocomplete="off" spellcheck="false" value=""></div><div><label for="gps-nm2-lat">Vĩ độ NM2</label><input id="gps-nm2-lat" inputmode="decimal" autocomplete="off" spellcheck="false" value=""></div><div><label for="gps-radius">Bán kính (km)</label><input id="gps-radius" inputmode="decimal" autocomplete="off" spellcheck="false" value="1"></div><div><label for="gps-min-km">Quãng đường tối thiểu (km)</label><input id="gps-min-km" inputmode="decimal" autocomplete="off" spellcheck="false" value="5"></div></div><p class="hint">Chỉ lưu trên thiết bị khi bấm Lưu cài đặt. Có thể chạy mà không lưu. Không dùng lưu cài đặt trên thiết bị dùng chung.</p><div class="grid"><button data-action="xl-gps-save">Lưu cài đặt GPS</button><button data-action="xl-gps-clear">Xóa cài đặt GPS</button></div><button class="primary" data-action="xl-gps">Kiểm tra và tách chuyến GPS</button></section>
+<section data-host="Excel"><h2>Kiểm tra hành trình GPS</h2><p class="hint">Đọc sheet Data từ dòng 5, các cột B:G. Cấu hình từ 1 đến 50 nhà máy. Mỗi nhà máy có tên, tọa độ và bán kính riêng.</p><div id="gps-factories"></div><button data-action="xl-gps-add">+ Thêm nhà máy</button><div class="grid"><div><label for="gps-min-km">Quãng đường tối thiểu (km)</label><input id="gps-min-km" inputmode="decimal" value="5"></div><div><label for="gps-factory-minutes">Dừng tại nhà máy (phút, ≥)</label><input id="gps-factory-minutes" inputmode="decimal" value="30"></div><div><label for="gps-rest-minutes">Dừng nghỉ (phút, &gt;)</label><input id="gps-rest-minutes" inputmode="decimal" value="10"></div></div><p class="hint">Không có tọa độ mặc định. Chỉ lưu trên thiết bị khi bấm Lưu cài đặt; có thể chạy mà không lưu. Không lưu trên thiết bị dùng chung.</p><div class="grid"><button data-action="xl-gps-save">Lưu cài đặt GPS</button><button data-action="xl-gps-clear">Xóa cài đặt GPS</button></div><button class="primary" data-action="xl-gps">Kiểm tra và tách chuyến GPS</button></section>
     <section>
       <h2>Chuẩn hoá văn bản</h2>
       <p class="hint">Áp dụng cho vùng hoặc đoạn văn bản đang chọn.</p>
@@ -105,10 +105,10 @@
 
   <p id="status" role="status" aria-live="polite"></p>
 
-  <script src="textutils.js?v=1.0.7"></script>
-  <script src="extra.js?v=1.0.7"></script>
-  <script src="general.js?v=1.0.7"></script>
-  <script src="gps.js?v=1.0.7"></script>
-  <script src="taskpane.js?v=1.0.7"></script>
+  <script src="textutils.js?v=1.0.8"></script>
+  <script src="extra.js?v=1.0.8"></script>
+  <script src="general.js?v=1.0.8"></script>
+  <script src="gps.js?v=1.0.8"></script>
+  <script src="taskpane.js?v=1.0.8"></script>
 </body>
 </html>

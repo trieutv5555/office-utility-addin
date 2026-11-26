@@ -4,8 +4,8 @@ function calculate(data, config){
   config = validateConfig(config);
   const FIRST_DATA_ROW = 5;
 
-  const MIN_FACTORY_STOP_MINUTES = 30;
-  const MIN_REST_MINUTES = 10;
+  const MIN_FACTORY_STOP_MINUTES = config.factoryMinutes;
+  const MIN_REST_MINUTES = config.restMinutes;
   const MIN_TRIP_KM = config.minKm;
   const MAX_MERGE_GAP_MINUTES = 10;
   const MAX_REST_MOVE_KM = 1;
@@ -14,13 +14,12 @@ function calculate(data, config){
   const times = data.map(row => excelDate(row[0]));
 
   // 1. Nhận diện nhà máy bằng GPS, không dựa vào tên địa chỉ.
-  const FACTORY_RADIUS_KM = config.radius;
   const factories = config.factories;
   const factoryCodes = data.map(row => {
     if (!validGps(row)) return "";
     for (const f of factories) {
       if (haversineKm(f.lat, f.lon, toNumber(row[2]),
-        toNumber(row[1])) <= FACTORY_RADIUS_KM) return f.code;
+        toNumber(row[1])) <= f.radius) return f.code;
     }
     return "";
   });
@@ -49,7 +48,7 @@ function calculate(data, config){
   }
 
   // 2. Một lần lưu tại nhà máy bao gồm cả di chuyển nội bộ.
-  // Mốc đến: đầu lần dừng dài đầu tiên (>=30 phút), nếu có.
+  // Mốc đến: đầu lần dừng dài đầu tiên đạt ngưỡng cấu hình, nếu có.
   // Mốc đi: mẫu vận tốc 0 cuối cùng trước khi rời vùng GPS.
   const factoryStops = [];
   for (let i = 0; i < data.length;) {
@@ -135,7 +134,7 @@ function calculate(data, config){
 
     // Ngưỡng quãng đường cấu hình áp dụng cho cả chuyến đủ mốc
     // lẫn chuyến thiếu đầu hoặc chưa về.
-    if (!Number.isFinite(tripKm) || tripKm < MIN_TRIP_KM) {
+    if (!Number.isFinite(tripKm) || tripKm + 1e-9 < MIN_TRIP_KM) {
       continue;
     }
 
@@ -222,7 +221,7 @@ function calculate(data, config){
       note +=
         (note ? " " : "") +
         `Đi ngang ${passedFactories.join(", ")}: ` +
-        "không dừng đủ 30 phút.";
+        `không dừng đủ ${MIN_FACTORY_STOP_MINUTES} phút.`;
     }
 
     const tripLabel = segment.partial === "cuối"
@@ -342,7 +341,7 @@ function calculate(data, config){
       const minutes =
         (times[last.end] - times[first.start]) * 1440;
 
-      if (minutes <= MIN_REST_MINUTES) continue;
+      if (minutes <= MIN_REST_MINUTES + 1e-6) continue;
 
       rests.push({
         trip: tripNumber,
@@ -395,10 +394,9 @@ function validGps(row) {
   return (
     Number.isFinite(lon) &&
     Number.isFinite(lat) &&
-    lon > 100 &&
-    lon < 110 &&
-    lat > 8 &&
-    lat < 24
+    lon >= -180 && lon <= 180 &&
+    lat >= -90 && lat <= 90 &&
+    !(lon === 0 && lat === 0)
   );
 }
 
@@ -422,39 +420,99 @@ function haversineKm(
     Math.asin(Math.sqrt(Math.min(1, Math.max(0, h))));
 }
 // Local device configuration only. No requests are made with these values.
-const KEY='office-utility.gps.settings.v1';
-const fieldIds=['gps-nm1-lon','gps-nm1-lat','gps-nm2-lon','gps-nm2-lat','gps-radius','gps-min-km'];
+const LEGACY_KEY='office-utility.gps.settings.v1';
+const KEY='office-utility.gps.settings.v2';
+const MAX_FACTORIES=50;
+const root=()=>document.getElementById('gps-factories');
+const readNum=v=>{const s=String(v).trim().replace(',','.');return s===''?NaN:Number(s);};
+function positive(value,max,label){
+ if(!Number.isFinite(value)||value<=0||value>max)throw Error(label+' phải lớn hơn 0 và không vượt '+max+'.');
+ return value;
+}
 function validateConfig(c){
- if(!c||!Array.isArray(c.factories)||c.factories.length!==2)throw Error('Nhập tọa độ NM1 và NM2.');
- const radius=c.radius,minKm=c.minKm;
- if(!Number.isFinite(radius)||radius<=0||radius>100)throw Error('Bán kính phải lớn hơn 0 và không vượt 100 km.');
- if(!Number.isFinite(minKm)||minKm<=0||minKm>100000)throw Error('Quãng đường tối thiểu phải lớn hơn 0 và không vượt 100.000 km.');
+ if(!c||!Array.isArray(c.factories)||c.factories.length<1||c.factories.length>MAX_FACTORIES)throw Error('Cần cấu hình từ 1 đến '+MAX_FACTORIES+' nhà máy.');
+ const minKm=positive(c.minKm,100000,'Quãng đường tối thiểu (km)');
+ const factoryMinutes=positive(c.factoryMinutes,10080,'Thời gian dừng nhà máy (phút)');
+ const restMinutes=positive(c.restMinutes,10080,'Thời gian dừng nghỉ (phút)');
+ const names=new Set();
  const factories=c.factories.map((f,i)=>{
-   if(!f||!Number.isFinite(f.lon)||!Number.isFinite(f.lat)||f.lon< -180||f.lon>180||f.lat< -90||f.lat>90)throw Error('Tọa độ NM'+(i+1)+' không hợp lệ.');
-   return {code:'NM'+(i+1),lon:f.lon,lat:f.lat};
+  const code=typeof f?.code==='string'?f.code.trim().normalize('NFC'):'';
+  if(!code||code.length>100||/^[=+@-]|[\x00-\x1f\x7f]/.test(code))throw Error('Tên nhà máy '+(i+1)+' không hợp lệ.');
+  const key=code.toLocaleLowerCase('vi');if(names.has(key))throw Error('Tên nhà máy bị trùng: '+code);names.add(key);
+  if(!Number.isFinite(f.lon)||!Number.isFinite(f.lat)||f.lon< -180||f.lon>180||f.lat< -90||f.lat>90||(f.lon===0&&f.lat===0))throw Error('Tọa độ của '+code+' không hợp lệ.');
+  return {code,lon:f.lon,lat:f.lat,radius:positive(f.radius,100,'Bán kính của '+code+' (km)')};
  });
- if(haversineKm(factories[0].lat,factories[0].lon,factories[1].lat,factories[1].lon)<=2*radius)throw Error('Hai vùng nhà máy bị chồng lấn. Kiểm tra tọa độ hoặc giảm bán kính.');
- return {factories,radius,minKm};
+ for(let i=0;i<factories.length;i++)for(let j=i+1;j<factories.length;j++){
+  const a=factories[i],b=factories[j];
+  if(haversineKm(a.lat,a.lon,b.lat,b.lon)<=a.radius+b.radius)throw Error('Vùng GPS của '+a.code+' và '+b.code+' chồng lấn hoặc tiếp xúc. Kiểm tra tọa độ hoặc giảm bán kính.');
+ }
+ return {factories,minKm,factoryMinutes,restMinutes};
+}
+function migrateLegacy(old){
+ if(!old||!Array.isArray(old.factories))throw Error('Cấu hình cũ không hợp lệ.');
+ return validateConfig({factories:old.factories.map((f,i)=>({code:f.code||'NM'+(i+1),lon:f.lon,lat:f.lat,radius:old.radius})),minKm:old.minKm,factoryMinutes:30,restMinutes:10});
+}
+function rowField(row,key){return row.querySelector('[data-gps-field="'+key+'"]');}
+function refreshRows(){
+ const rows=Array.from(root().children);
+ rows.forEach((row,i)=>{
+  row.querySelector('.gps-factory-title').textContent='Nhà máy '+(i+1);
+  row.querySelector('.gps-remove').disabled=rows.length===1;
+ });
+ const addBtn=document.querySelector('[data-action="xl-gps-add"]');
+ if(addBtn)addBtn.setAttribute('aria-label','Thêm nhà máy (tối đa '+MAX_FACTORIES+')');
+}
+function appendFactory(f){
+ const row=document.createElement('div');row.className='gps-factory';
+ const head=document.createElement('div');head.className='gps-factory-head';
+ const title=document.createElement('strong');title.className='gps-factory-title';
+ const remove=document.createElement('button');remove.type='button';remove.className='gps-remove';remove.textContent='Xóa';
+ remove.addEventListener('click',()=>{if(typeof busy!=='undefined'&&busy)return;if(root().children.length<=1)return;row.remove();refreshRows();});
+ head.append(title,remove);row.append(head);
+ const fields=[['code','Tên nhà máy',f.code],['lon','Kinh độ',f.lon],['lat','Vĩ độ',f.lat],['radius','Bán kính (km)',f.radius]];
+ const grid=document.createElement('div');grid.className='grid';
+ for(const [key,label,value] of fields){
+  const wrap=document.createElement('label');wrap.textContent=label;wrap.className=key==='code'?'wide':'';
+  const input=document.createElement('input');input.type='text';input.dataset.gpsField=key;input.autocomplete='off';input.spellcheck=false;
+  if(key!=='code')input.inputMode='decimal';input.value=value==null?'':String(value);
+  wrap.append(input);grid.append(wrap);
+ }
+ row.append(grid);root().append(row);refreshRows();
+}
+function add(){
+ if(root().children.length>=MAX_FACTORIES)throw Error('Tối đa '+MAX_FACTORIES+' nhà máy.');
+ const names=new Set(Array.from(root().children,r=>rowField(r,'code').value.trim().toLocaleLowerCase('vi')));
+ let i=1;while(names.has(('NM'+i).toLowerCase()))i++;
+ appendFactory({code:'NM'+i,radius:1});return 'Đã thêm nhà máy. Nhập tọa độ rồi lưu nếu cần.';
 }
 function readConfig(){
- const nums=fieldIds.map(id=>{const v=document.getElementById(id).value.trim().replace(',','.');return v===''?NaN:Number(v);});
- return validateConfig({factories:[{lon:nums[0],lat:nums[1]},{lon:nums[2],lat:nums[3]}],radius:nums[4],minKm:nums[5]});
+ const factories=Array.from(root().children,row=>({code:rowField(row,'code').value,lon:readNum(rowField(row,'lon').value),lat:readNum(rowField(row,'lat').value),radius:readNum(rowField(row,'radius').value)}));
+ return validateConfig({factories,minKm:readNum(document.getElementById('gps-min-km').value),factoryMinutes:readNum(document.getElementById('gps-factory-minutes').value),restMinutes:readNum(document.getElementById('gps-rest-minutes').value)});
 }
 function displayConfig(c){
- const values=c?[c.factories[0].lon,c.factories[0].lat,c.factories[1].lon,c.factories[1].lat,c.radius,c.minKm]:['','','','',1,5];
- fieldIds.forEach((id,i)=>document.getElementById(id).value=String(values[i]));
+ root().replaceChildren();
+ const factories=c?c.factories:[{code:'NM1',radius:1}];
+ factories.forEach(appendFactory);
+ document.getElementById('gps-min-km').value=String(c?c.minKm:5);
+ document.getElementById('gps-factory-minutes').value=String(c?c.factoryMinutes:30);
+ document.getElementById('gps-rest-minutes').value=String(c?c.restMinutes:10);
 }
 function init(){
- try{const v=localStorage.getItem(KEY);if(v)displayConfig(validateConfig(JSON.parse(v)));}
- catch(_){displayConfig(null);}
+ let c=null;
+ try{
+  const v=localStorage.getItem(KEY);
+  if(v)c=validateConfig(JSON.parse(v));
+  else{const old=localStorage.getItem(LEGACY_KEY);if(old){c=migrateLegacy(JSON.parse(old));try{localStorage.setItem(KEY,JSON.stringify(c));localStorage.removeItem(LEGACY_KEY);}catch(_){/* retain old settings if migration cannot persist */}}}
+ }catch(_){c=null;}
+ displayConfig(c);
 }
 function save(){
  const c=readConfig();
- try{localStorage.setItem(KEY,JSON.stringify(c));}catch(_){throw Error('Không lưu được cục bộ. Bạn vẫn có thể nhập tọa độ và chạy trong phiên hiện tại.');}
- return 'Đã lưu cấu hình GPS trên thiết bị này.';
+ try{localStorage.setItem(KEY,JSON.stringify(c));localStorage.removeItem(LEGACY_KEY);}catch(_){throw Error('Không lưu được hoàn toàn cấu hình cục bộ. Bạn vẫn có thể chạy trong phiên hiện tại.');}
+ return 'Đã lưu '+c.factories.length+' nhà máy trên thiết bị này.';
 }
 function clear(){
- try{localStorage.removeItem(KEY);}catch(_){throw Error('Không xóa được cấu hình trong bộ nhớ cục bộ.');}
+ try{localStorage.removeItem(KEY);localStorage.removeItem(LEGACY_KEY);}catch(_){throw Error('Không xóa được cấu hình trong bộ nhớ cục bộ.');}
  displayConfig(null);return 'Đã xóa cấu hình GPS trên thiết bị này.';
 }
 async function run(){
@@ -475,12 +533,12 @@ async function run(){
  const matrix=Array.from({length:de},()=>Array(15).fill(''));
  const put=(r,values)=>values.forEach((v,c)=>matrix[r-1][c]=v);
  put(1,['TÁCH CHUYẾN ĐI – '+String(plate.values[0][0]).split(':').pop().trim()]);
- put(2,['NM1 / NM2 | Bán kính GPS '+config.radius+' km']);put(3,['GPS – Chuyến ≥'+config.minKm+' km; dừng nhà máy ≥30 phút.']);
+ put(2,['Nhà máy: '+config.factories.map(f=>f.code+' ('+f.radius+' km)').join(' | ')]);put(3,['GPS – Chuyến ≥'+config.minKm+' km; dừng nhà máy ≥'+config.factoryMinutes+' phút.']);
  put(4,['Chuyến','Điểm đi','Điểm xa nhất (điểm đến)','Điểm về','Bắt đầu','Kết thúc','Quãng đường (km)','Thời gian (giờ)','Dòng bắt đầu','Dòng kết thúc','Km đầu','Km cuối','Đến điểm xa nhất lúc','Dòng điểm xa nhất','Ghi chú']);
  trips.forEach((t,i)=>put(i+5,t.map((v,c)=>[1,2,3,6,7,10,11].includes(c)&&typeof v==='string'&&v.startsWith('=')?'':v)));
- put(total,['Tổng']);put(dt,['CHI TIẾT DỪNG NGHỈ TRÊN 10 PHÚT']);put(dt+1,['Chuyến ≥'+config.minKm+' km; gộp điểm dừng cùng địa chỉ hoặc ≤300 m, cách <10 phút, xe nhích <1 km.']);
+ put(total,['Tổng']);put(dt,['CHI TIẾT DỪNG NGHỈ TRÊN '+config.restMinutes+' PHÚT']);put(dt+1,['Chuyến ≥'+config.minKm+' km; gộp điểm dừng cùng địa chỉ hoặc ≤300 m, cách <10 phút, xe nhích <1 km.']);
  put(dh,['Chuyến','Thứ tự dừng','Địa chỉ','Bắt đầu dừng','Kết thúc dừng','Thời gian (phút)','Dòng đầu Data','Dòng cuối Data']);
- rests.forEach((r,i)=>put(df+i,[r.trip,r.order,TextUtils.safeSpreadsheetText(r.address),times[r.start],times[r.end],r.minutes,r.start+5,r.end+5]));if(!rests.length)put(df,['Không có điểm dừng trên 10 phút']);matrix[de-1][4]='Tổng';
+ rests.forEach((r,i)=>put(df+i,[r.trip,r.order,TextUtils.safeSpreadsheetText(r.address),times[r.start],times[r.end],r.minutes,r.start+5,r.end+5]));if(!rests.length)put(df,['Không có điểm dừng trên '+config.restMinutes+' phút']);matrix[de-1][4]='Tổng';
  for(let i=0;i<matrix.length;i+=1000)out.getRangeByIndexes(i,0,Math.min(1000,matrix.length-i),15).values=matrix.slice(i,i+1000);
  trips.forEach((t,i)=>[1,2,3,6,7,10,11].forEach(c=>{if(typeof t[c]==='string'&&t[c].startsWith('='))out.getCell(i+4,c).formulas=[[t[c]]];}));
  if(trips.length){out.getRange('G'+total+':H'+total).formulas=[['=SUM(G5:G'+(total-1)+')','=SUM(H5:H'+(total-1)+')']];for(const a of ['E5:F'+(total-1),'M5:M'+(total-1)])out.getRange(a).numberFormat=Array.from({length:trips.length},()=>Array(a.startsWith('E')?2:1).fill('dd/mm/yyyy hh:mm:ss'));for(const a of ['G5:H'+(total-1),'K5:L'+(total-1)])out.getRange(a).numberFormat=Array.from({length:trips.length},()=>['0.00','0.00']);}else out.getRange('G'+total+':H'+total).values=[[0,0]];
@@ -496,5 +554,5 @@ async function run(){
  out.activate();await ctx.sync();return 'GPS: Đã ghi '+trips.length+' chuyến ≥'+config.minKm+' km và '+rests.length+' lần dừng vào Chuyến đi 1.';
  });
 }
-return {run,calculate,init,save,clear,validateConfig};
+return {run,calculate,init,save,clear,add,validateConfig,migrateLegacy};
 })();
