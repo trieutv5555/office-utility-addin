@@ -15,6 +15,8 @@ Các điều kiện GPS có hướng dẫn và ví dụ ngay dưới ô nhập. 
 
 Sau khi lưu thành công, phần cài đặt GPS tự thu gọn; mở lại bằng Chỉnh sửa cài đặt GPS. Khi mở lại tiện ích, cấu hình đã lưu được nạp và phần chỉnh sửa mặc định thu gọn. Nút chạy luôn nằm ngoài phần chỉnh sửa.
 
+Báo cáo GPS dùng độ rộng cột giới hạn, tự xuống dòng cho địa chỉ và ghi chú, căn giữa theo chiều dọc và tự điều chỉnh chiều cao dòng. Các cột ngày giờ vẫn đủ chỗ hiển thị ngày giờ đến giây.
+
 ## Sử dụng
 
 Add-in dùng Office.js, chạy trên các phiên bản Office tương thích (không hỗ trợ Office 2010). Triển khai qua GitHub Pages, không cần VBA hay máy chủ cục bộ.

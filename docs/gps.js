@@ -549,6 +549,35 @@ async function clear(){
  try{localStorage.removeItem(KEY);localStorage.removeItem(LEGACY_KEY);}catch(_){throw Error('Không xóa được cấu hình trong bộ nhớ cục bộ.');}
  savedSnapshot=null;displayConfig(null);showSettings(true);return 'Đã xóa cấu hình GPS trên thiết bị này.';
 }
+// Office.js columnWidth is measured in points, not pixels.
+function formatReport(out,{total,dt,dh,df,de,tripCount,restCount}){
+ const all=out.getRange('A1:O'+de).format;
+ all.font.name='Calibri';all.font.size=10;
+ all.verticalAlignment='Center';all.wrapText=false;all.rowHeight=15;
+ // The two report tables share columns; D/E/F must also accommodate date/time.
+ const widths=[43,62,150,104,104,104,70,70,65,65,65,65,104,65,180];
+ widths.forEach((w,i)=>{out.getRangeByIndexes(0,i,1,1).format.columnWidth=w;});
+ for(const a of ['A4:O4','A'+dh+':H'+dh]){
+  const f=out.getRange(a).format;f.wrapText=true;f.horizontalAlignment='Center';f.verticalAlignment='Center';
+ }
+ if(tripCount){
+  const last=total-1;
+  // Factory names, addresses and notes may be long; do not enlarge the columns.
+  out.getRange('B5:D'+last).format.wrapText=true;
+  out.getRange('O5:O'+last).format.wrapText=true;
+  out.getRange('A5:A'+last).format.wrapText=true;
+  out.getRange('A5:A'+last).format.horizontalAlignment='Center';
+ }
+ if(restCount){
+  out.getRange('C'+df+':C'+(de-1)).format.wrapText=true;
+  out.getRange('A'+df+':B'+(de-1)).format.horizontalAlignment='Center';
+ }
+ // Titles and full-width notes remain on a single line across empty cells.
+ for(const a of ['A1:O1','A'+dt+':H'+dt])out.getRange(a).format.rowHeight=19;
+ // Fit height only, after the widths and Wrap Text have been set.
+ out.getRange('A4:O'+Math.max(4,total-1)).format.autofitRows();
+ out.getRange('A'+dh+':H'+Math.max(dh,de-1)).format.autofitRows();
+}
 async function run(){
  const config=readConfig();
  if(!Office.context.requirements.isSetSupported('ExcelApi','1.4'))throw Error('Cần ExcelApi 1.4.');
@@ -582,11 +611,9 @@ async function run(){
  for(const a of ['A1:O1','A'+dt+':H'+dt]){const f=out.getRange(a).format;f.fill.color='#214365';f.font.color='#FFFFFF';f.font.bold=true;}
  for(const a of ['A4:O4','A'+dh+':H'+dh]){const f=out.getRange(a).format;f.fill.color='#DCEAF5';f.font.bold=true;}
  for(const a of ['A'+total+':O'+total,'E'+de+':F'+de])out.getRange(a).format.font.bold=true;
- [100,180,290,160,160,160,110,110,100,100,100,100,160,110,300].forEach((w,i)=>out.getRangeByIndexes(0,i,1,1).format.columnWidth=w);
- for(const a of ['A4:O4','A'+dh+':H'+dh]){const f=out.getRange(a).format;f.wrapText=true;f.verticalAlignment='Center';f.autofitRows();}
- if(trips.length)out.getRange('O5:O'+(total-1)).format.wrapText=true;
+ formatReport(out,{total,dt,dh,df,de,tripCount:trips.length,restCount:rests.length});
  out.activate();await ctx.sync();return 'GPS: Đã ghi '+trips.length+' chuyến ≥'+config.minKm+' km và '+rests.length+' lần dừng vào Chuyến đi 1.';
  });
 }
-return {run,calculate,init,save,clear,add,resetDefaults,toggleSettings,validateConfig,migrateLegacy};
+return {run,calculate,init,save,clear,add,resetDefaults,toggleSettings,validateConfig,migrateLegacy,formatReport};
 })();
