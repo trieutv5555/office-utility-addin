@@ -7,6 +7,10 @@ Tiện ích tiếng Việt dành cho Microsoft Excel và Word, giúp xử lý d�
 - **Excel:** đọc số thành chữ, tìm dòng trùng, kiểm tra công thức và lỗi dữ liệu, tìm kiếm nhiều sheet, so sánh vùng, chuyển đổi dữ liệu, gộp sheet và báo cáo có liên kết.
 - **Word:** chuẩn hóa văn bản, dọn khoảng trắng, thay thế hàng loạt, rà soát dấu câu, đọc số tiền thành chữ căn lề A4 và AutoFit bảng hàng loạt.
 
+## GPS (Excel)
+
+Nhập tọa độ NM1/NM2, bán kính và quãng đường tối thiểu trong khung tiện ích. Tọa độ không có giá trị mặc định; chỉ lưu trong bộ nhớ cục bộ của thiết bị khi chọn Lưu cài đặt GPS. Có thể xóa cài đặt hoặc chạy mà không lưu. Dữ liệu hành trình được đọc từ workbook, không gửi đến máy chủ của add-in.
+
 ## Sử dụng
 
 Add-in dùng Office.js, chạy trên các phiên bản Office tương thích (không hỗ trợ Office 2010). Triển khai qua GitHub Pages, không cần VBA hay máy chủ cục bộ.

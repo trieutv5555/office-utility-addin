@@ -374,6 +374,9 @@ function parsePairs(text) {
 /* ---------- Điều phối ---------- */
 
 const ACTIONS = {
+  'xl-gps': () => GPS.run(),
+  'xl-gps-save': () => GPS.save(),
+  'xl-gps-clear': () => GPS.clear(),
   ...Extra.actions,
   ...General.actions,
   trim: () => (HOST === 'Excel' ? excelTransform(TEXT_OPS.trim) : wordSelectionTransform(TEXT_OPS.trim)),
@@ -420,6 +423,7 @@ Office.onReady((info) => {
   }
   document.documentElement.dataset.host = HOST;
   Extra.init(HOST);
+  if(HOST==='Excel' && typeof GPS!=='undefined') GPS.init();
   $('#host-label').textContent = HOST === 'Excel' ? 'Đang chạy trong Excel' : 'Đang chạy trong Word';
   document.querySelectorAll('button[data-action]').forEach((b) => b.addEventListener('click', () => run(b)));
   $('#fx-results').addEventListener('click', (e) => {
