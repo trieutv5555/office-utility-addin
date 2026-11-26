@@ -11,6 +11,8 @@ Tiện ích tiếng Việt dành cho Microsoft Excel và Word, giúp xử lý d�
 
 Cấu hình từ 1 đến 50 nhà máy trong khung tiện ích: tên, tọa độ và bán kính riêng. Điều chỉnh ngưỡng chuyến (mặc định 5 km), thời gian dừng tại nhà máy (mặc định ≥30 phút) và dừng nghỉ (mặc định >10 phút). Cấu hình đã lưu từ 1.0.7 được tự chuyển sang định dạng mới. Tọa độ không có giá trị mặc định; chỉ lưu trong bộ nhớ cục bộ của thiết bị khi chọn Lưu cài đặt GPS. Có thể xóa cài đặt hoặc chạy mà không lưu. Dữ liệu hành trình được đọc từ workbook, không gửi đến máy chủ của add-in.
 
+Các điều kiện GPS có hướng dẫn và ví dụ ngay dưới ô nhập. Khôi phục mặc định chỉ đặt lại 5 km, 30 phút, 10 phút; không đổi danh sách nhà máy. Xóa cài đặt cần xác nhận và xóa cả tọa độ đã lưu.
+
 ## Sử dụng
 
 Add-in dùng Office.js, chạy trên các phiên bản Office tương thích (không hỗ trợ Office 2010). Triển khai qua GitHub Pages, không cần VBA hay máy chủ cục bộ.

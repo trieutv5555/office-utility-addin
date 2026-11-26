@@ -5,18 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tiện ích văn phòng</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <link rel="stylesheet" href="taskpane.css?v=1.0.8">
+  <link rel="stylesheet" href="taskpane.css?v=1.0.9">
 </head>
 <body>
   <header>
     <h1>Tiện ích văn phòng</h1>
-    <p id="app-version">Phiên bản 1.0.8</p>
+    <p id="app-version">Phiên bản 1.0.9</p>
     <p id="host-label">Đang kết nối với Office…</p>
   </header>
 
   <label for="tool-search">Tìm công cụ</label><input id="tool-search" type="search" placeholder="Ví dụ: công thức, trùng, số">
   <main>
-<section data-host="Excel"><h2>Kiểm tra hành trình GPS</h2><p class="hint">Đọc sheet Data từ dòng 5, các cột B:G. Cấu hình từ 1 đến 50 nhà máy. Mỗi nhà máy có tên, tọa độ và bán kính riêng.</p><div id="gps-factories"></div><button data-action="xl-gps-add">+ Thêm nhà máy</button><div class="grid"><div><label for="gps-min-km">Quãng đường tối thiểu (km)</label><input id="gps-min-km" inputmode="decimal" value="5"></div><div><label for="gps-factory-minutes">Dừng tại nhà máy (phút, ≥)</label><input id="gps-factory-minutes" inputmode="decimal" value="30"></div><div><label for="gps-rest-minutes">Dừng nghỉ (phút, &gt;)</label><input id="gps-rest-minutes" inputmode="decimal" value="10"></div></div><p class="hint">Không có tọa độ mặc định. Chỉ lưu trên thiết bị khi bấm Lưu cài đặt; có thể chạy mà không lưu. Không lưu trên thiết bị dùng chung.</p><div class="grid"><button data-action="xl-gps-save">Lưu cài đặt GPS</button><button data-action="xl-gps-clear">Xóa cài đặt GPS</button></div><button class="primary" data-action="xl-gps">Kiểm tra và tách chuyến GPS</button></section>
+<section data-host="Excel" id="gps-section">
+<h2>Kiểm tra hành trình GPS</h2>
+<div class="gps-intro"><strong>Cài đặt kiểm tra hành trình GPS</strong><p class="hint">Đọc dữ liệu từ sheet Data, cột B:G, bắt đầu từ dòng 5. Cấu hình chỉ lưu trên thiết bị khi bạn bấm Lưu cài đặt GPS.</p></div>
+<h3 class="gps-heading">Danh sách nhà máy</h3>
+<p class="hint">Thêm từ 1 đến 50 nhà máy. Nhập kinh độ, vĩ độ theo độ thập phân; có thể lấy từ dữ liệu GPS tại vị trí xe đỗ ở nhà máy. Không có tọa độ mặc định.</p>
+<div id="gps-factories"></div>
+<button type="button" class="gps-add" data-action="xl-gps-add">+ Thêm nhà máy</button>
+<h3 class="gps-heading">Điều kiện xác định chuyến đi</h3>
+<div class="gps-rule"><label for="gps-min-km">Quãng đường tối thiểu của chuyến (km)</label><input id="gps-min-km" inputmode="decimal" value="5" aria-describedby="gps-km-hint"><p class="hint" id="gps-km-hint">Chỉ ghi nhận chuyến có tổng quãng đường từ giá trị này trở lên. Ví dụ: đặt 5 km thì bỏ qua chuyến dưới 5 km.</p></div>
+<div class="gps-rule"><label for="gps-factory-minutes">Thời gian dừng tối thiểu để xác nhận xe về nhà máy (phút)</label><input id="gps-factory-minutes" inputmode="decimal" value="30" aria-describedby="gps-factory-hint"><p class="hint" id="gps-factory-hint">Tổng thời gian xe đứng yên trong một lần lưu tại vùng GPS nhà máy phải đạt ngưỡng này để xác nhận mốc tách chuyến. Ví dụ: đặt 30 phút, nếu xe chỉ ghé 15 phút rồi đi tiếp thì không tách chuyến.</p></div>
+<div class="gps-rule"><label for="gps-rest-minutes">Ngưỡng thống kê dừng xe giữa chuyến (phút)</label><input id="gps-rest-minutes" inputmode="decimal" value="10" aria-describedby="gps-rest-hint"><p class="hint" id="gps-rest-hint">Chỉ đưa vào báo cáo những lần dừng lâu hơn giá trị này, kể cả giao hàng, chờ hàng, ăn uống. Ví dụ: đặt 10 phút thì dừng 45 phút được ghi nhận, dừng đúng 10 phút không ghi. Không dùng ngưỡng này để tách chuyến.</p></div>
+<div class="gps-example"><strong>Gợi ý sử dụng</strong><p>Chỉ có một nhà máy vẫn dùng được: Nhà máy → Giao hàng → Nhà máy. Nếu có nhiều nhà máy, chuyến có thể kết thúc ở nhà máy khác.</p><p>Ví dụ với mặc định: xe đi 20 km, dừng giao hàng 45 phút rồi về nhà máy dừng 60 phút: ghi nhận một chuyến và một lần dừng giao hàng.</p></div>
+<p class="hint">Khôi phục mặc định chỉ đặt lại ba điều kiện 5 km, 30 phút, 10 phút; giữ nguyên tên, tọa độ và bán kính. Xóa cài đặt sẽ xóa cả danh sách đã lưu. Có thể chạy mà không lưu; không lưu trên thiết bị dùng chung.</p>
+<div class="gps-actions"><button type="button" data-action="xl-gps-reset">Khôi phục mặc định</button><button type="button" data-action="xl-gps-clear">Xóa cài đặt GPS</button><button type="button" class="primary gps-save" data-action="xl-gps-save">Lưu cài đặt GPS</button><button type="button" class="primary gps-run" data-action="xl-gps">Kiểm tra và tách chuyến GPS</button></div>
+</section>
     <section>
       <h2>Chuẩn hoá văn bản</h2>
       <p class="hint">Áp dụng cho vùng hoặc đoạn văn bản đang chọn.</p>
@@ -105,10 +119,10 @@
 
   <p id="status" role="status" aria-live="polite"></p>
 
-  <script src="textutils.js?v=1.0.8"></script>
-  <script src="extra.js?v=1.0.8"></script>
-  <script src="general.js?v=1.0.8"></script>
-  <script src="gps.js?v=1.0.8"></script>
-  <script src="taskpane.js?v=1.0.8"></script>
+  <script src="textutils.js?v=1.0.9"></script>
+  <script src="extra.js?v=1.0.9"></script>
+  <script src="general.js?v=1.0.9"></script>
+  <script src="gps.js?v=1.0.9"></script>
+  <script src="taskpane.js?v=1.0.9"></script>
 </body>
 </html>

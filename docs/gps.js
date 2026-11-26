@@ -432,8 +432,8 @@ function positive(value,max,label){
 function validateConfig(c){
  if(!c||!Array.isArray(c.factories)||c.factories.length<1||c.factories.length>MAX_FACTORIES)throw Error('Cần cấu hình từ 1 đến '+MAX_FACTORIES+' nhà máy.');
  const minKm=positive(c.minKm,100000,'Quãng đường tối thiểu (km)');
- const factoryMinutes=positive(c.factoryMinutes,10080,'Thời gian dừng nhà máy (phút)');
- const restMinutes=positive(c.restMinutes,10080,'Thời gian dừng nghỉ (phút)');
+ const factoryMinutes=positive(c.factoryMinutes,10080,'Thời gian dừng tối thiểu tại nhà máy (phút)');
+ const restMinutes=positive(c.restMinutes,10080,'Ngưỡng thống kê dừng xe giữa chuyến (phút)');
  const names=new Set();
  const factories=c.factories.map((f,i)=>{
   const code=typeof f?.code==='string'?f.code.trim().normalize('NFC'):'';
@@ -469,13 +469,15 @@ function appendFactory(f){
  const remove=document.createElement('button');remove.type='button';remove.className='gps-remove';remove.textContent='Xóa';
  remove.addEventListener('click',()=>{if(typeof busy!=='undefined'&&busy)return;if(root().children.length<=1)return;row.remove();refreshRows();});
  head.append(title,remove);row.append(head);
- const fields=[['code','Tên nhà máy',f.code],['lon','Kinh độ',f.lon],['lat','Vĩ độ',f.lat],['radius','Bán kính (km)',f.radius]];
+ const fields=[['code','Tên nhà máy',f.code],['lon','Kinh độ',f.lon],['lat','Vĩ độ',f.lat],['radius','Bán kính nhận diện (km)',f.radius]];
  const grid=document.createElement('div');grid.className='grid';
  for(const [key,label,value] of fields){
-  const wrap=document.createElement('label');wrap.textContent=label;wrap.className=key==='code'?'wide':'';
+  const wrap=document.createElement('label');wrap.textContent=label;wrap.className=(key==='code'||key==='radius')?'wide':'';
   const input=document.createElement('input');input.type='text';input.dataset.gpsField=key;input.autocomplete='off';input.spellcheck=false;
   if(key!=='code')input.inputMode='decimal';input.value=value==null?'':String(value);
-  wrap.append(input);grid.append(wrap);
+  wrap.append(input);
+  if(key==='radius'){const hint=document.createElement('span');hint.className='gps-field-hint';hint.textContent='Phạm vi tính từ tọa độ trên; xe trong vùng này có thể được xác nhận đang ở nhà máy.';wrap.append(hint);}
+  grid.append(wrap);
  }
  row.append(grid);root().append(row);refreshRows();
 }
@@ -511,7 +513,14 @@ function save(){
  try{localStorage.setItem(KEY,JSON.stringify(c));localStorage.removeItem(LEGACY_KEY);}catch(_){throw Error('Không lưu được hoàn toàn cấu hình cục bộ. Bạn vẫn có thể chạy trong phiên hiện tại.');}
  return 'Đã lưu '+c.factories.length+' nhà máy trên thiết bị này.';
 }
-function clear(){
+function resetDefaults(){
+ document.getElementById('gps-min-km').value='5';
+ document.getElementById('gps-factory-minutes').value='30';
+ document.getElementById('gps-rest-minutes').value='10';
+ return 'Đã khôi phục 3 điều kiện mặc định (5 km, 30 phút, 10 phút). Tên, tọa độ và bán kính từng nhà máy giữ nguyên. Bấm Lưu cài đặt nếu muốn lưu.';
+}
+async function clear(){
+ if(!await officeConfirm('Xóa toàn bộ cấu hình GPS đã lưu trên thiết bị này, gồm cả tên và tọa độ nhà máy?'))return 'Đã huỷ.';
  try{localStorage.removeItem(KEY);localStorage.removeItem(LEGACY_KEY);}catch(_){throw Error('Không xóa được cấu hình trong bộ nhớ cục bộ.');}
  displayConfig(null);return 'Đã xóa cấu hình GPS trên thiết bị này.';
 }
@@ -533,12 +542,12 @@ async function run(){
  const matrix=Array.from({length:de},()=>Array(15).fill(''));
  const put=(r,values)=>values.forEach((v,c)=>matrix[r-1][c]=v);
  put(1,['TÁCH CHUYẾN ĐI – '+String(plate.values[0][0]).split(':').pop().trim()]);
- put(2,['Nhà máy: '+config.factories.map(f=>f.code+' ('+f.radius+' km)').join(' | ')]);put(3,['GPS – Chuyến ≥'+config.minKm+' km; dừng nhà máy ≥'+config.factoryMinutes+' phút.']);
+ put(2,['Nhà máy: '+config.factories.map(f=>f.code+' ('+f.radius+' km)').join(' | ')]);put(3,['GPS – Chuyến ≥'+config.minKm+' km; xác nhận mốc nhà máy khi tổng thời gian dừng ≥'+config.factoryMinutes+' phút.']);
  put(4,['Chuyến','Điểm đi','Điểm xa nhất (điểm đến)','Điểm về','Bắt đầu','Kết thúc','Quãng đường (km)','Thời gian (giờ)','Dòng bắt đầu','Dòng kết thúc','Km đầu','Km cuối','Đến điểm xa nhất lúc','Dòng điểm xa nhất','Ghi chú']);
  trips.forEach((t,i)=>put(i+5,t.map((v,c)=>[1,2,3,6,7,10,11].includes(c)&&typeof v==='string'&&v.startsWith('=')?'':v)));
- put(total,['Tổng']);put(dt,['CHI TIẾT DỪNG NGHỈ TRÊN '+config.restMinutes+' PHÚT']);put(dt+1,['Chuyến ≥'+config.minKm+' km; gộp điểm dừng cùng địa chỉ hoặc ≤300 m, cách <10 phút, xe nhích <1 km.']);
+ put(total,['Tổng']);put(dt,['CHI TIẾT DỪNG XE GIỮA CHUYẾN TRÊN '+config.restMinutes+' PHÚT']);put(dt+1,['Chuyến ≥'+config.minKm+' km; gộp điểm dừng cùng địa chỉ hoặc ≤300 m, cách <10 phút, xe nhích <1 km.']);
  put(dh,['Chuyến','Thứ tự dừng','Địa chỉ','Bắt đầu dừng','Kết thúc dừng','Thời gian (phút)','Dòng đầu Data','Dòng cuối Data']);
- rests.forEach((r,i)=>put(df+i,[r.trip,r.order,TextUtils.safeSpreadsheetText(r.address),times[r.start],times[r.end],r.minutes,r.start+5,r.end+5]));if(!rests.length)put(df,['Không có điểm dừng trên '+config.restMinutes+' phút']);matrix[de-1][4]='Tổng';
+ rests.forEach((r,i)=>put(df+i,[r.trip,r.order,TextUtils.safeSpreadsheetText(r.address),times[r.start],times[r.end],r.minutes,r.start+5,r.end+5]));if(!rests.length)put(df,['Không có lần dừng xe giữa chuyến trên '+config.restMinutes+' phút']);matrix[de-1][4]='Tổng';
  for(let i=0;i<matrix.length;i+=1000)out.getRangeByIndexes(i,0,Math.min(1000,matrix.length-i),15).values=matrix.slice(i,i+1000);
  trips.forEach((t,i)=>[1,2,3,6,7,10,11].forEach(c=>{if(typeof t[c]==='string'&&t[c].startsWith('='))out.getCell(i+4,c).formulas=[[t[c]]];}));
  if(trips.length){out.getRange('G'+total+':H'+total).formulas=[['=SUM(G5:G'+(total-1)+')','=SUM(H5:H'+(total-1)+')']];for(const a of ['E5:F'+(total-1),'M5:M'+(total-1)])out.getRange(a).numberFormat=Array.from({length:trips.length},()=>Array(a.startsWith('E')?2:1).fill('dd/mm/yyyy hh:mm:ss'));for(const a of ['G5:H'+(total-1),'K5:L'+(total-1)])out.getRange(a).numberFormat=Array.from({length:trips.length},()=>['0.00','0.00']);}else out.getRange('G'+total+':H'+total).values=[[0,0]];
@@ -554,5 +563,5 @@ async function run(){
  out.activate();await ctx.sync();return 'GPS: Đã ghi '+trips.length+' chuyến ≥'+config.minKm+' km và '+rests.length+' lần dừng vào Chuyến đi 1.';
  });
 }
-return {run,calculate,init,save,clear,add,validateConfig,migrateLegacy};
+return {run,calculate,init,save,clear,add,resetDefaults,validateConfig,migrateLegacy};
 })();
