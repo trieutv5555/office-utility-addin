@@ -552,10 +552,10 @@ async function clear(){
 // Office.js columnWidth is measured in points, not pixels.
 function formatReport(out,{total,dt,dh,df,de,tripCount,restCount}){
  const all=out.getRange('A1:O'+de).format;
- all.font.name='Calibri';all.font.size=10;
+ all.font.name='Times New Roman';all.font.size=10;
  all.verticalAlignment='Center';all.wrapText=false;all.rowHeight=15;
  // The two report tables share columns; D/E/F must also accommodate date/time.
- const widths=[43,62,150,104,104,104,70,70,65,65,65,65,104,65,180];
+ const widths=[43,62,180,104,104,104,70,70,65,65,65,65,104,65,180];
  widths.forEach((w,i)=>{out.getRangeByIndexes(0,i,1,1).format.columnWidth=w;});
  for(const a of ['A4:O4','A'+dh+':H'+dh]){
   const f=out.getRange(a).format;f.wrapText=true;f.horizontalAlignment='Center';f.verticalAlignment='Center';
